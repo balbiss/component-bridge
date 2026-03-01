@@ -1,10 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Button } from '@/components/ui/button';
 import { Pricing } from '@/components/ui/pricing';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Code, Palette, Zap, Users, Star, Shield } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ArrowRight, Code, Palette, Zap, Users, Star, Shield, Menu, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // --- ANIMATION HELPERS ---
 const fadeUp = {
@@ -146,6 +146,15 @@ const StatBlock: React.FC<{ value: string; label: string }> = ({ value, label })
 
 // --- MAIN LANDING PAGE ---
 const LandingPage: React.FC = () => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navLinks = [
+    { label: "Recursos", href: "#features" },
+    { label: "Planos", href: "#pricing" },
+    { label: "Números", href: "#stats" },
+    { label: "Contato", href: "#cta" },
+  ];
+
   return (
     <div className="relative min-h-screen text-white overflow-hidden">
       <AuroraBackground />
@@ -168,13 +177,12 @@ const LandingPage: React.FC = () => {
             </div>
 
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm text-white/70 hover:text-white transition-colors">Recursos</a>
-              <a href="#pricing" className="text-sm text-white/70 hover:text-white transition-colors">Planos</a>
-              <a href="#stats" className="text-sm text-white/70 hover:text-white transition-colors">Números</a>
-              <a href="#cta" className="text-sm text-white/70 hover:text-white transition-colors">Contato</a>
+              {navLinks.map(link => (
+                <a key={link.href} href={link.href} className="text-sm text-white/70 hover:text-white transition-colors">{link.label}</a>
+              ))}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-3">
               <Link to="/login">
                 <Button variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10 text-sm">
                   Entrar
@@ -186,7 +194,54 @@ const LandingPage: React.FC = () => {
                 </Button>
               </Link>
             </div>
+
+            {/* Mobile hamburger */}
+            <button
+              className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Menu"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </nav>
+
+          {/* Mobile menu */}
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="md:hidden overflow-hidden"
+              >
+                <div className="max-w-6xl mx-auto pt-4 pb-6 flex flex-col gap-3">
+                  {navLinks.map(link => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="text-sm text-white/70 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-white/10"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                  <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-white/10">
+                    <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className="w-full text-white/80 hover:text-white hover:bg-white/10 text-sm justify-start">
+                        Entrar
+                      </Button>
+                    </Link>
+                    <Link to="/cadastro" onClick={() => setMobileMenuOpen(false)}>
+                      <Button className="w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 text-sm">
+                        Cadastre-se
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.header>
 
         {/* Hero */}
