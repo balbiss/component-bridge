@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { Button } from '@/components/ui/button';
 import { Pricing } from '@/components/ui/pricing';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Code, Palette, Zap, Users, Star, Shield } from 'lucide-react';
+import { ArrowRight, Code, Palette, Zap, Users, Star, Shield, Quote } from 'lucide-react';
 
 // --- ANIMATED AURORA BACKGROUND ---
 const AuroraBackground: React.FC = () => {
@@ -318,6 +318,50 @@ const LandingPage: React.FC = () => {
                 <StatBlock value="50+" label="Clientes ativos" />
                 <StatBlock value="24/7" label="Suporte" />
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Testimonials */}
+        <section id="testimonials" className="px-5 sm:px-8 lg:px-16 py-16 sm:py-24">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl font-bold text-white">O que nossos clientes dizem</h2>
+              <p className="text-white/50 mt-3 max-w-lg mx-auto text-sm sm:text-base">
+                Empresas que transformaram seus negócios com a InoovaWeb
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {[
+                { name: "Ana Silva", role: "CEO, TechStart", quote: "A InoovaWeb revolucionou a forma como gerenciamos nossos projetos. A produtividade da equipe aumentou em 40% nos primeiros 3 meses.", initials: "AS" },
+                { name: "Carlos Mendes", role: "CTO, DataFlow", quote: "O suporte é excepcional e a plataforma é incrivelmente intuitiva. Melhor investimento que fizemos para nossa infraestrutura digital.", initials: "CM" },
+                { name: "Marina Costa", role: "Diretora de Produto, Appify", quote: "Migramos toda nossa stack para a InoovaWeb e o resultado superou todas as expectativas. Performance e segurança de primeiro nível.", initials: "MC" },
+                { name: "Rafael Torres", role: "Fundador, PixelLab", quote: "Design incrível e ferramentas poderosas. Conseguimos lançar nosso MVP em metade do tempo previsto graças à plataforma.", initials: "RT" },
+                { name: "Juliana Oliveira", role: "Head de Engenharia, CloudBR", quote: "A escalabilidade da InoovaWeb é impressionante. Crescemos de 1.000 para 100.000 usuários sem nenhum problema.", initials: "JO" },
+                { name: "Pedro Almeida", role: "Gerente de Projetos, NovaTech", quote: "A colaboração em equipe ficou muito mais fluida. Todos os nossos times agora trabalham integrados em um único lugar.", initials: "PA" },
+              ].map((t, index) => (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 sm:p-8 transition-all duration-300 hover:bg-white/10 hover:border-white/20 flex flex-col"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-purple-600/30 border border-purple-400/30 flex items-center justify-center text-sm font-semibold text-purple-300">
+                      {t.initials}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{t.name}</p>
+                      <p className="text-xs text-white/40">{t.role}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-white/60 leading-relaxed flex-1">"{t.quote}"</p>
+                  <div className="flex gap-0.5 mt-4">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-3.5 h-3.5 fill-purple-400 text-purple-400" />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
