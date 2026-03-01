@@ -6,7 +6,7 @@ interface Testimonial {
   name: string;
   role: string;
   company: string;
-  initials: string;
+  avatar: string;
   rating: number;
   text: string;
   results: string[];
@@ -21,7 +21,7 @@ const defaultTestimonials: Testimonial[] = [
     name: "Ana Silva",
     role: "CEO, TechStart",
     company: "TechStart",
-    initials: "AS",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face",
     rating: 5,
     text: "A InoovaWeb revolucionou a forma como gerenciamos nossos projetos. A produtividade da equipe aumentou em 40% nos primeiros 3 meses.",
     results: ["40% mais produtividade", "Entrega 2x mais rápida", "ROI imediato"]
@@ -30,7 +30,7 @@ const defaultTestimonials: Testimonial[] = [
     name: "Carlos Mendes",
     role: "CTO, DataFlow",
     company: "DataFlow",
-    initials: "CM",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
     rating: 5,
     text: "O suporte é excepcional e a plataforma é incrivelmente intuitiva. Melhor investimento que fizemos para nossa infraestrutura digital.",
     results: ["Suporte 24/7", "Integração perfeita", "Zero downtime"]
@@ -39,7 +39,7 @@ const defaultTestimonials: Testimonial[] = [
     name: "Marina Costa",
     role: "Diretora de Produto, Appify",
     company: "Appify",
-    initials: "MC",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face",
     rating: 5,
     text: "Migramos toda nossa stack para a InoovaWeb e o resultado superou todas as expectativas. Performance e segurança de primeiro nível.",
     results: ["Performance 3x melhor", "Segurança avançada", "Migração suave"]
@@ -48,7 +48,7 @@ const defaultTestimonials: Testimonial[] = [
     name: "Rafael Torres",
     role: "Fundador, PixelLab",
     company: "PixelLab",
-    initials: "RT",
+    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
     rating: 5,
     text: "Design incrível e ferramentas poderosas. Conseguimos lançar nosso MVP em metade do tempo previsto graças à plataforma.",
     results: ["MVP 50% mais rápido", "Design premium", "Escalável"]
@@ -57,7 +57,7 @@ const defaultTestimonials: Testimonial[] = [
     name: "Juliana Oliveira",
     role: "Head de Engenharia, CloudBR",
     company: "CloudBR",
-    initials: "JO",
+    avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop&crop=face",
     rating: 5,
     text: "A escalabilidade da InoovaWeb é impressionante. Crescemos de 1.000 para 100.000 usuários sem nenhum problema.",
     results: ["100x escalabilidade", "Alta disponibilidade", "Custo otimizado"]
@@ -159,9 +159,11 @@ export function PremiumTestimonials({ testimonials = defaultTestimonials }: Prem
                 <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full">
                   {/* User Info */}
                   <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
-                    <div className="w-10 h-10 rounded-full bg-purple-600/30 border border-purple-400/40 flex items-center justify-center text-sm font-bold text-purple-300">
-                      {current.initials}
-                    </div>
+                    <img
+                      src={current.avatar}
+                      alt={current.name}
+                      className="w-10 h-10 rounded-full object-cover border border-purple-400/40"
+                    />
                     <div className="min-w-0">
                       <p className="font-semibold text-white text-sm">{current.name}</p>
                       <p className="text-xs text-white/40">{current.role}</p>
