@@ -5,6 +5,7 @@ import { Pricing } from '@/components/ui/pricing';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Code, Palette, Zap, Users, Star, Shield } from 'lucide-react';
 import { PremiumTestimonials } from '@/components/ui/premium-testimonials';
+import { Logos3 } from '@/components/ui/logos3';
 
 // --- ANIMATED AURORA BACKGROUND ---
 const AuroraBackground: React.FC = () => {
@@ -203,6 +204,9 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {/* Logo Carousel */}
+        <Logos3 />
 
         {/* Features */}
         <section id="features" className="px-5 sm:px-8 lg:px-16 py-16 sm:py-24">
