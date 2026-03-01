@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { Button } from '@/components/ui/button';
+import { Pricing } from '@/components/ui/pricing';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Code, Palette, Zap, Users, Star, Shield } from 'lucide-react';
 
@@ -151,6 +152,7 @@ const LandingPage: React.FC = () => {
 
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-sm text-white/70 hover:text-white transition-colors">Recursos</a>
+              <a href="#pricing" className="text-sm text-white/70 hover:text-white transition-colors">Planos</a>
               <a href="#stats" className="text-sm text-white/70 hover:text-white transition-colors">Números</a>
               <a href="#cta" className="text-sm text-white/70 hover:text-white transition-colors">Contato</a>
             </div>
@@ -245,6 +247,66 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {/* Pricing */}
+        <Pricing plans={[
+          {
+            name: "INICIANTE",
+            price: "49",
+            yearlyPrice: "39",
+            period: "por mês",
+            features: [
+              "Até 10 projetos",
+              "Análises básicas",
+              "Suporte em 48 horas",
+              "Acesso limitado à API",
+              "Suporte da comunidade",
+            ],
+            description: "Perfeito para projetos individuais",
+            buttonText: "Começar grátis",
+            href: "/cadastro",
+            isPopular: false,
+          },
+          {
+            name: "PROFISSIONAL",
+            price: "99",
+            yearlyPrice: "79",
+            period: "por mês",
+            features: [
+              "Projetos ilimitados",
+              "Análises avançadas",
+              "Suporte em 24 horas",
+              "Acesso total à API",
+              "Suporte prioritário",
+              "Colaboração em equipe",
+              "Integrações personalizadas",
+            ],
+            description: "Ideal para equipes em crescimento",
+            buttonText: "Escolher plano",
+            href: "/cadastro",
+            isPopular: true,
+          },
+          {
+            name: "EMPRESARIAL",
+            price: "299",
+            yearlyPrice: "239",
+            period: "por mês",
+            features: [
+              "Tudo do Profissional",
+              "Soluções personalizadas",
+              "Gerente de conta dedicado",
+              "Suporte em 1 hora",
+              "Autenticação SSO",
+              "Segurança avançada",
+              "Contratos personalizados",
+              "Acordo de SLA",
+            ],
+            description: "Para grandes organizações",
+            buttonText: "Falar com vendas",
+            href: "/cadastro",
+            isPopular: false,
+          },
+        ]} />
 
         {/* Stats */}
         <section id="stats" className="px-5 sm:px-8 lg:px-16 py-16 sm:py-24">
