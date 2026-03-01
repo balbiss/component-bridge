@@ -24,7 +24,7 @@ const Index = () => {
       <ShaderBackground />
 
       <div className="relative z-10 w-full max-w-md px-4">
-        <Card className="border-purple-300/20 bg-purple-200/15 backdrop-blur-xl shadow-2xl shadow-purple-500/10">
+        <Card className="border-white/20 bg-white/15 backdrop-blur-xl shadow-2xl">
           <CardHeader className="text-center space-y-1">
             <CardTitle className="text-2xl font-bold text-card-foreground">
               Bem-vindo de volta
