@@ -33,23 +33,23 @@ const Index = () => {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-              Welcome back
+              Bem-vindo de volta
             </h1>
             <p className="text-base text-muted-foreground mt-2">
-              Sign in to your account to continue
+              Entre na sua conta para continuar
             </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">E-mail</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="Digite seu e-mail"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="h-11 pl-10 text-sm"
@@ -59,13 +59,13 @@ const Index = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">Senha</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" />
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
+                  placeholder="Digite sua senha"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="h-11 pl-10 pr-10 text-sm"
@@ -91,7 +91,7 @@ const Index = () => {
                   className="h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-ring"
                 />
                 <label htmlFor="remember" className="text-sm text-muted-foreground cursor-pointer select-none">
-                  Remember me
+                  Lembrar de mim
                 </label>
               </div>
               <button
@@ -99,12 +99,12 @@ const Index = () => {
                 className="text-sm text-primary hover:underline font-medium"
                 onClick={() => console.log('Forgot password')}
               >
-                Forgot password?
+                Esqueceu a senha?
               </button>
             </div>
 
             <Button type="submit" className="w-full h-11 text-sm font-medium" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? 'Entrando...' : 'Entrar'}
             </Button>
           </form>
 
@@ -113,7 +113,7 @@ const Index = () => {
             <Separator />
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="bg-background px-3 text-sm text-muted-foreground">
-                Or continue with
+                Ou continue com
               </span>
             </div>
           </div>
@@ -139,12 +139,12 @@ const Index = () => {
 
           {/* Footer */}
           <p className="text-center text-sm text-muted-foreground mt-8">
-            Don't have an account?{' '}
+            Não tem uma conta?{' '}
             <button
               className="text-primary hover:underline font-medium"
               onClick={() => console.log('Sign up')}
             >
-              Sign up
+              Cadastre-se
             </button>
           </p>
         </div>
