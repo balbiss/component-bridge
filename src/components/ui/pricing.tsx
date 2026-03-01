@@ -97,10 +97,10 @@ export function Pricing({
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: index * 0.1 }}
               className={cn(
-                "relative rounded-2xl border p-6 sm:p-8 flex flex-col backdrop-blur-sm transition-all duration-300",
+                "relative rounded-2xl border p-6 sm:p-8 flex flex-col transition-all duration-300",
                 plan.isPopular
-                  ? "border-purple-400/40 bg-white/10 scale-[1.02] shadow-lg shadow-purple-500/10"
-                  : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
+                  ? "border-purple-400/40 bg-white scale-[1.02] shadow-lg shadow-purple-500/10"
+                  : "border-gray-200 bg-white hover:shadow-md"
               )}
             >
               {plan.isPopular && (
@@ -113,25 +113,25 @@ export function Pricing({
               )}
 
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-white/60 tracking-widest mb-4">
+                <h3 className="text-sm font-semibold text-gray-500 tracking-widest mb-4">
                   {plan.name}
                 </h3>
 
                 <div className="flex items-baseline gap-1">
-                  <span className="text-white text-sm">R$</span>
+                  <span className="text-gray-800 text-sm">R$</span>
                   <NumberFlow
                     value={Number(isMonthly ? plan.price : plan.yearlyPrice)}
                     format={{ useGrouping: false }}
                     transformTiming={{ duration: 500, easing: "ease-out" }}
                     willChange
-                    className="text-4xl font-bold text-white tabular-nums"
+                    className="text-4xl font-bold text-gray-900 tabular-nums"
                   />
                   {plan.period !== "Próximos 3 meses" && (
-                    <span className="text-white/40 text-sm ml-1">/ {plan.period}</span>
+                    <span className="text-gray-400 text-sm ml-1">/ {plan.period}</span>
                   )}
                 </div>
 
-                <p className="text-xs text-white/40 mt-2">
+                <p className="text-xs text-gray-400 mt-2">
                   {isMonthly ? "cobrado mensalmente" : "cobrado anualmente"}
                 </p>
               </div>
@@ -139,8 +139,8 @@ export function Pricing({
               <ul className="space-y-3 mb-8 flex-1">
                 {plan.features.map((feature, idx) => (
                   <li key={idx} className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-purple-400 mt-0.5 shrink-0" />
-                    <span className="text-sm text-white/70">{feature}</span>
+                    <Check className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                    <span className="text-sm text-gray-600">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -153,12 +153,12 @@ export function Pricing({
                     "w-full text-sm font-medium",
                     plan.isPopular
                       ? "bg-purple-600 text-white hover:bg-purple-700 border-0"
-                      : "border-white/20 text-white hover:bg-white/10 bg-transparent"
+                      : "border-gray-300 text-gray-800 hover:bg-gray-50 bg-transparent"
                   )}
                 >
                   {plan.buttonText}
                 </Link>
-                <p className="text-xs text-white/30 text-center mt-3">
+                <p className="text-xs text-gray-400 text-center mt-3">
                   {plan.description}
                 </p>
               </div>
