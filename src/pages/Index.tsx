@@ -20,11 +20,16 @@ const Index = () => {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      <ShaderBackground />
+    <div className="relative min-h-screen flex overflow-hidden">
+      {/* Lado esquerdo - shader */}
+      <div className="hidden md:block w-1/2 relative">
+        <ShaderBackground />
+      </div>
 
-      <div className="relative z-10 w-full max-w-md px-4">
-        <Card className="border-white/20 bg-white/15 backdrop-blur-xl shadow-2xl">
+      {/* Lado direito - branco com card */}
+      <div className="w-full md:w-1/2 min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md">
+        <Card className="border shadow-lg">
           <CardHeader className="text-center space-y-1">
             <CardTitle className="text-2xl font-bold text-card-foreground">
               Bem-vindo de volta
@@ -84,7 +89,7 @@ const Index = () => {
             <div className="relative my-6">
               <Separator />
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="bg-card px-2 text-xs text-muted-foreground">
+                <span className="bg-background px-2 text-xs text-muted-foreground">
                   Ou continue com
                 </span>
               </div>
@@ -116,6 +121,7 @@ const Index = () => {
             </p>
           </CardFooter>
         </Card>
+        </div>
       </div>
     </div>
   );
