@@ -142,7 +142,7 @@ export function PremiumTestimonials({ testimonials = defaultTestimonials }: Prem
         </motion.div>
 
         {/* Testimonial Card */}
-        <div className="relative min-h-[200px] sm:min-h-[180px]">
+        <div className="relative min-h-[280px] sm:min-h-[200px]">
           <AnimatePresence initial={false} custom={direction} mode="wait">
             <motion.div
               key={currentIndex}
@@ -155,32 +155,35 @@ export function PremiumTestimonials({ testimonials = defaultTestimonials }: Prem
               className="absolute inset-0"
             >
               <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 sm:p-6 h-full">
-                <div className="flex flex-row items-start gap-4 h-full">
+                {/* Mobile: stacked layout, Desktop: row */}
+                <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 h-full">
                   {/* User Info */}
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="relative">
-                      <div className="w-10 h-10 rounded-full bg-purple-600/30 border border-purple-400/40 flex items-center justify-center text-sm font-bold text-purple-300">
-                        {current.initials}
-                      </div>
+                  <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-purple-600/30 border border-purple-400/40 flex items-center justify-center text-sm font-bold text-purple-300">
+                      {current.initials}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white text-sm">{current.name}</p>
+                      <p className="text-xs text-white/40">{current.role}</p>
+                    </div>
+                    <div className="flex gap-0.5 ml-auto sm:hidden shrink-0">
+                      {[...Array(current.rating)].map((_, i) => (
+                        <Star key={i} className="w-3 h-3 fill-purple-400 text-purple-400" />
+                      ))}
                     </div>
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 flex flex-col justify-between min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-white text-sm">{current.name}</p>
-                      <span className="text-white/20">·</span>
-                      <p className="text-xs text-white/40 truncate">{current.role}</p>
-                      <div className="flex gap-0.5 ml-auto shrink-0">
-                        {[...Array(current.rating)].map((_, i) => (
-                          <Star key={i} className="w-3 h-3 fill-purple-400 text-purple-400" />
-                        ))}
-                      </div>
+                    <div className="hidden sm:flex gap-0.5 mb-2">
+                      {[...Array(current.rating)].map((_, i) => (
+                        <Star key={i} className="w-3 h-3 fill-purple-400 text-purple-400" />
+                      ))}
                     </div>
                     <p className="text-white/70 text-sm leading-relaxed italic">
                       "{current.text}"
                     </p>
-                    <div className="flex flex-wrap gap-2 mt-4">
+                    <div className="flex flex-wrap gap-2 mt-3">
                       {current.results.map((result, i) => (
                         <span
                           key={i}
