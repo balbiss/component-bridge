@@ -157,8 +157,9 @@ const ShaderBackground = () => {
     };
 
     const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const parent = canvas.parentElement;
+      canvas.width = parent?.clientWidth || window.innerWidth;
+      canvas.height = parent?.clientHeight || window.innerHeight;
       gl.viewport(0, 0, canvas.width, canvas.height);
     };
     window.addEventListener('resize', resizeCanvas);
@@ -190,8 +191,7 @@ const ShaderBackground = () => {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 w-full h-full"
-      style={{ zIndex: 0 }}
+      className="absolute inset-0 w-full h-full"
     />
   );
 };
