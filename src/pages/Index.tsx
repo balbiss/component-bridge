@@ -21,27 +21,30 @@ const Index = () => {
   };
 
   return (
-    <div className="relative min-h-screen flex overflow-hidden">
-      {/* Lado esquerdo - shader */}
-      <div className="hidden md:block w-1/2 relative">
+    <div className="relative min-h-screen flex flex-col md:flex-row overflow-hidden">
+      {/* Shader - fundo no mobile, lado esquerdo no desktop */}
+      <div className="absolute inset-0 md:relative md:w-1/2 md:block">
         <ShaderBackground />
       </div>
 
-      {/* Lado direito - branco com login */}
-      <div className="w-full md:w-1/2 min-h-screen flex items-center justify-center bg-background px-8 lg:px-16">
-        <div className="w-full max-w-[420px]">
+      {/* Overlay escuro no mobile para legibilidade */}
+      <div className="absolute inset-0 bg-black/40 md:hidden" />
+
+      {/* Lado direito - login */}
+      <div className="relative z-10 w-full md:w-1/2 min-h-screen flex items-center justify-center md:bg-background px-5 sm:px-8 lg:px-16 py-8">
+        <div className="w-full max-w-[420px] md:bg-transparent bg-background/95 backdrop-blur-sm md:backdrop-blur-none rounded-2xl md:rounded-none p-6 sm:p-8 md:p-0 shadow-xl md:shadow-none">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+          <div className="mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
               Bem-vindo de volta
             </h1>
-            <p className="text-base text-muted-foreground mt-2">
+            <p className="text-sm sm:text-base text-muted-foreground mt-2">
               Entre na sua conta para continuar
             </p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium">E-mail</Label>
               <div className="relative">
@@ -109,7 +112,7 @@ const Index = () => {
           </form>
 
           {/* Divider */}
-          <div className="relative my-8">
+          <div className="relative my-6 sm:my-8">
             <Separator />
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="bg-background px-3 text-sm text-muted-foreground">
@@ -119,7 +122,7 @@ const Index = () => {
           </div>
 
           {/* Social buttons */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <Button variant="outline" className="h-11 text-sm font-medium" onClick={() => console.log('Google login')}>
               <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -138,7 +141,7 @@ const Index = () => {
           </div>
 
           {/* Footer */}
-          <p className="text-center text-sm text-muted-foreground mt-8">
+          <p className="text-center text-sm text-muted-foreground mt-6 sm:mt-8">
             Não tem uma conta?{' '}
             <button
               className="text-primary hover:underline font-medium"
