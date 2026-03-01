@@ -144,9 +144,9 @@ const LandingPage: React.FC = () => {
           <nav className="max-w-6xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center font-bold text-sm text-white">
-                LP
+                IW
               </div>
-              <span className="font-semibold text-white text-lg">LovaPlatform</span>
+              <span className="font-semibold text-white text-lg">InoovaWeb</span>
             </div>
 
             <div className="hidden md:flex items-center gap-8">
@@ -288,7 +288,7 @@ const LandingPage: React.FC = () => {
         {/* Footer */}
         <footer className="px-5 sm:px-8 lg:px-16 py-8 border-t border-white/10">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-white/40">© 2026 LovaPlatform. Todos os direitos reservados.</p>
+            <p className="text-sm text-white/40">© 2026 InoovaWeb. Todos os direitos reservados.</p>
             <div className="flex gap-6">
               <a href="#" className="text-sm text-white/40 hover:text-white/70 transition-colors">Termos</a>
               <a href="#" className="text-sm text-white/40 hover:text-white/70 transition-colors">Privacidade</a>
