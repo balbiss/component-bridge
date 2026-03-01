@@ -148,6 +148,11 @@ const Index = () => {
               Cadastre-se
             </Link>
           </p>
+          <p className="text-center text-sm text-muted-foreground mt-2">
+            <Link to="/" className="text-primary hover:underline font-medium">
+              ← Voltar para o início
+            </Link>
+          </p>
         </div>
       </div>
     </div>
