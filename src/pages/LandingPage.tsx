@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Button } from '@/components/ui/button';
 import { Pricing } from '@/components/ui/pricing';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Code, Palette, Zap, Users, Star, Shield } from 'lucide-react';
+import { ArrowRight, Code, Palette, Zap, Users, Star, Shield, Menu, X } from 'lucide-react';
 import { PremiumTestimonials } from '@/components/ui/premium-testimonials';
 import { Logos3 } from '@/components/ui/logos3';
 
@@ -136,6 +136,8 @@ const StatBlock: React.FC<{ value: string; label: string }> = ({ value, label })
 
 // --- MAIN LANDING PAGE ---
 const LandingPage: React.FC = () => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="relative min-h-screen text-white overflow-hidden">
       <AuroraBackground />
@@ -159,7 +161,7 @@ const LandingPage: React.FC = () => {
               <a href="#cta" className="text-sm text-white/70 hover:text-white transition-colors">Contato</a>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-3">
               <Link to="/login">
                 <Button variant="ghost" className="text-white/80 hover:text-white hover:bg-white/10 text-sm">
                   Entrar
@@ -171,7 +173,37 @@ const LandingPage: React.FC = () => {
                 </Button>
               </Link>
             </div>
+
+            {/* Mobile menu button */}
+            <button
+              className="md:hidden p-2 text-white/80 hover:text-white"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </nav>
+
+          {/* Mobile menu */}
+          {mobileMenuOpen && (
+            <div className="md:hidden mt-4 rounded-2xl border border-white/10 bg-purple-950/90 backdrop-blur-lg p-6 space-y-4">
+              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-white/70 hover:text-white py-2">Recursos</a>
+              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-white/70 hover:text-white py-2">Planos</a>
+              <a href="#stats" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-white/70 hover:text-white py-2">Números</a>
+              <a href="#cta" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-white/70 hover:text-white py-2">Contato</a>
+              <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
+                <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className="w-full text-white/80 hover:text-white hover:bg-white/10 text-sm">
+                    Entrar
+                  </Button>
+                </Link>
+                <Link to="/cadastro" onClick={() => setMobileMenuOpen(false)}>
+                  <Button className="w-full bg-white/10 border border-white/20 text-white hover:bg-white/20 text-sm">
+                    Cadastre-se
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
         </header>
 
         {/* Hero */}
