@@ -142,7 +142,7 @@ export function PremiumTestimonials({ testimonials = defaultTestimonials }: Prem
         </motion.div>
 
         {/* Testimonial Card */}
-        <div className="relative min-h-[320px] sm:min-h-[280px]">
+        <div className="relative min-h-[200px] sm:min-h-[180px]">
           <AnimatePresence initial={false} custom={direction} mode="wait">
             <motion.div
               key={currentIndex}
@@ -154,34 +154,30 @@ export function PremiumTestimonials({ testimonials = defaultTestimonials }: Prem
               transition={{ duration: 0.5, ease: [0.23, 0.86, 0.39, 0.96] }}
               className="absolute inset-0"
             >
-              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 sm:p-10 h-full">
-                <div className="flex flex-col sm:flex-row gap-6 h-full">
+              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 sm:p-6 h-full">
+                <div className="flex flex-row items-start gap-4 h-full">
                   {/* User Info */}
-                  <div className="flex sm:flex-col items-center sm:items-start gap-4 sm:min-w-[160px]">
+                  <div className="flex items-center gap-3 shrink-0">
                     <div className="relative">
-                      <div className="w-14 h-14 rounded-full bg-purple-600/30 border-2 border-purple-400/40 flex items-center justify-center text-lg font-bold text-purple-300">
+                      <div className="w-10 h-10 rounded-full bg-purple-600/30 border border-purple-400/40 flex items-center justify-center text-sm font-bold text-purple-300">
                         {current.initials}
-                      </div>
-                      <motion.div
-                        className="absolute -inset-1 rounded-full border border-purple-400/20"
-                        animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0, 0.5] }}
-                        transition={{ duration: 3, repeat: Infinity }}
-                      />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-white">{current.name}</p>
-                      <p className="text-xs text-white/40">{current.role}</p>
-                      <div className="flex gap-0.5 mt-2">
-                        {[...Array(current.rating)].map((_, i) => (
-                          <Star key={i} className="w-3.5 h-3.5 fill-purple-400 text-purple-400" />
-                        ))}
                       </div>
                     </div>
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 flex flex-col justify-between">
-                    <p className="text-white/70 text-sm sm:text-base leading-relaxed italic">
+                  <div className="flex-1 flex flex-col justify-between min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-white text-sm">{current.name}</p>
+                      <span className="text-white/20">·</span>
+                      <p className="text-xs text-white/40 truncate">{current.role}</p>
+                      <div className="flex gap-0.5 ml-auto shrink-0">
+                        {[...Array(current.rating)].map((_, i) => (
+                          <Star key={i} className="w-3 h-3 fill-purple-400 text-purple-400" />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-white/70 text-sm leading-relaxed italic">
                       "{current.text}"
                     </p>
                     <div className="flex flex-wrap gap-2 mt-4">
