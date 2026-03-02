@@ -135,7 +135,7 @@ const Dashboard = () => {
         </nav>
 
         {/* User */}
-        <div className="p-3 border-t border-white/10">
+        <div className="p-3">
           <div className="flex items-center gap-3 px-2 py-2">
             <Avatar className="w-8 h-8 shrink-0">
               <AvatarFallback className="bg-purple-600/30 text-purple-300 text-xs font-semibold">
