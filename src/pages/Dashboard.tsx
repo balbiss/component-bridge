@@ -77,7 +77,7 @@ const recentOrders = [
 ];
 
 const Dashboard = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("dashboard");
   const location = useLocation();
 
@@ -92,12 +92,20 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 overflow-hidden relative">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-20 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
         className={`${
-          sidebarOpen ? "w-64" : "w-0 md:w-16"
-        } bg-[hsl(260,60%,8%)] flex flex-col transition-all duration-300 overflow-hidden shrink-0`}
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0 md:w-16"
+        } fixed md:relative z-30 w-64 md:w-64 h-full bg-[hsl(260,60%,8%)] flex flex-col transition-all duration-300 shrink-0`}
       >
         {/* Logo */}
         <div className="h-14 flex items-center px-4 gap-3 shrink-0">
