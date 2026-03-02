@@ -142,6 +142,15 @@ const Dashboard = () => {
           ))}
         </nav>
 
+        {/* Notifications */}
+        <div className="px-3">
+          <button className="relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/60 hover:bg-white/10 hover:text-white transition-colors">
+            <Bell className="w-5 h-5 shrink-0" />
+            {sidebarOpen && <span>Notificações</span>}
+            <span className="absolute top-2 left-7 w-2 h-2 bg-purple-500 rounded-full" />
+          </button>
+        </div>
+
         {/* User */}
         <div className="p-3 space-y-1">
           <div className="flex items-center gap-3 px-2 py-2">
@@ -170,23 +179,12 @@ const Dashboard = () => {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-14 flex items-center justify-between border-b border-gray-200 px-4 sm:px-6 bg-white shrink-0">
+        <header className="h-14 flex items-center border-b border-gray-200 px-4 sm:px-6 bg-white shrink-0">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-500 hover:text-gray-800 p-1">
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
             <h1 className="text-gray-900 font-semibold text-lg hidden sm:block">Dashboard</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <button className="relative p-2 text-gray-500 hover:text-gray-700">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-purple-600 rounded-full" />
-            </button>
-            <Avatar className="w-8 h-8">
-              <AvatarFallback className="bg-purple-100 text-purple-700 text-xs font-semibold">
-                JS
-              </AvatarFallback>
-            </Avatar>
           </div>
         </header>
 
