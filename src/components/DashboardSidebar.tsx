@@ -45,7 +45,7 @@ export function DashboardSidebar() {
   const isActive = (path: string) => currentPath === path;
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-purple-400/10 bg-purple-950/90">
+    <Sidebar collapsible="icon" className="border-r border-white/10 bg-[hsl(260,60%,8%)]">
       <div className="p-4 flex items-center gap-3">
         <div className="w-9 h-9 rounded-lg bg-purple-600/30 border border-purple-400/30 flex items-center justify-center font-bold text-sm text-purple-300 shrink-0">
           IW
