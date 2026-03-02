@@ -45,9 +45,9 @@ export function DashboardSidebar() {
   const isActive = (path: string) => currentPath === path;
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-white/10 bg-[hsl(260,60%,8%)]">
+    <Sidebar collapsible="icon" className="border-r-0 bg-[hsl(260,60%,8%)]">
       <div className="p-4 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-purple-600/30 border border-purple-400/30 flex items-center justify-center font-bold text-sm text-purple-300 shrink-0">
+        <div className="w-9 h-9 rounded-lg bg-purple-600/30 border border-purple-400/30 flex items-center justify-center font-bold text-sm text-white shrink-0">
           IW
         </div>
         {!collapsed && (
@@ -57,7 +57,7 @@ export function DashboardSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-purple-300/50 text-xs uppercase tracking-wider">
+          <SidebarGroupLabel className="text-white/50 text-xs uppercase tracking-wider">
             Principal
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -68,8 +68,8 @@ export function DashboardSidebar() {
                     <NavLink
                       to={item.url}
                       end
-                      className="text-purple-200/60 hover:text-white hover:bg-purple-800/40 transition-colors rounded-lg"
-                      activeClassName="bg-purple-800/50 text-white font-medium"
+                      className="text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
+                      activeClassName="bg-white/15 text-white font-medium"
                     >
                       <item.icon className="mr-2 h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
@@ -82,7 +82,7 @@ export function DashboardSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel className="text-purple-300/50 text-xs uppercase tracking-wider">
+          <SidebarGroupLabel className="text-white/50 text-xs uppercase tracking-wider">
             Sistema
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -93,8 +93,8 @@ export function DashboardSidebar() {
                     <NavLink
                       to={item.url}
                       end
-                      className="text-purple-200/60 hover:text-white hover:bg-purple-800/40 transition-colors rounded-lg"
-                      activeClassName="bg-purple-800/50 text-white font-medium"
+                      className="text-white/70 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
+                      activeClassName="bg-white/15 text-white font-medium"
                     >
                       <item.icon className="mr-2 h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
@@ -113,7 +113,7 @@ export function DashboardSidebar() {
             <SidebarMenuButton asChild>
               <NavLink
                 to="/login"
-                className="text-purple-300/50 hover:text-red-400 hover:bg-red-500/10 transition-colors rounded-lg"
+                className="text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors rounded-lg"
               >
                 <LogOut className="mr-2 h-4 w-4 shrink-0" />
                 {!collapsed && <span>Sair</span>}
