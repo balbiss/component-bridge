@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -80,6 +80,12 @@ const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("dashboard");
   const location = useLocation();
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const navItems: NavItem[] = [
     { icon: <LayoutDashboard className="w-4 h-4" />, label: "Dashboard", href: "dashboard" },
@@ -179,12 +185,21 @@ const Dashboard = () => {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-14 flex items-center border-b border-gray-200 px-4 sm:px-6 bg-white shrink-0">
+        <header className="h-14 flex items-center justify-between border-b border-gray-200 px-4 sm:px-6 bg-white shrink-0">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-500 hover:text-gray-800 p-1">
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
             <h1 className="text-gray-900 font-semibold text-lg hidden sm:block">Dashboard</h1>
+          </div>
+          <div className="text-sm text-gray-500">
+            <span className="hidden sm:inline">
+              {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              {' · '}
+            </span>
+            <span className="font-medium text-gray-700">
+              {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
           </div>
         </header>
 
