@@ -104,8 +104,8 @@ const Dashboard = () => {
       {/* Sidebar */}
       <aside
         className={`${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0 md:w-16"
-        } fixed md:relative z-30 w-64 md:w-64 h-full bg-[hsl(260,60%,8%)] flex flex-col transition-all duration-300 shrink-0`}
+          sidebarOpen ? "translate-x-0 w-64" : "-translate-x-full md:translate-x-0 md:w-16 w-64"
+        } fixed md:relative z-30 h-full bg-[hsl(260,60%,8%)] flex flex-col transition-all duration-300 shrink-0 overflow-hidden`}
       >
         {/* Logo */}
         <div className="h-14 flex items-center px-4 gap-3 shrink-0">
