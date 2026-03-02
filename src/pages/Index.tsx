@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import ShaderBackground from '@/components/ui/shader-background';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 const Index = () => {
   const [email, setEmail] = useState('');
@@ -33,19 +34,35 @@ const Index = () => {
 
       {/* Lado direito - login */}
       <div className="relative z-10 w-full md:w-1/2 min-h-screen flex items-center justify-center md:bg-background px-5 sm:px-8 lg:px-16 py-8">
-        <div className="w-full max-w-[420px] md:bg-transparent bg-background/95 backdrop-blur-sm md:backdrop-blur-none rounded-2xl md:rounded-none p-6 sm:p-8 md:p-0 shadow-xl md:shadow-none">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="w-full max-w-[420px] md:bg-transparent bg-background/95 backdrop-blur-sm md:backdrop-blur-none rounded-2xl md:rounded-none p-6 sm:p-8 md:p-0 shadow-xl md:shadow-none"
+        >
           {/* Header */}
-          <div className="mb-6 sm:mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.4 }}
+            className="mb-6 sm:mb-8"
+          >
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
               Bem-vindo de volta
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-2">
               Entre na sua conta para continuar
             </p>
-          </div>
+          </motion.div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+          <motion.form
+            onSubmit={handleSubmit}
+            className="space-y-4 sm:space-y-5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+          >
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium">E-mail</Label>
               <div className="relative">
@@ -110,20 +127,30 @@ const Index = () => {
             <Button type="submit" className="w-full h-11 text-sm font-medium" disabled={isLoading}>
               {isLoading ? 'Entrando...' : 'Entrar'}
             </Button>
-          </form>
+          </motion.form>
 
           {/* Divider */}
-          <div className="relative my-6 sm:my-8">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.45, duration: 0.4 }}
+            className="relative my-6 sm:my-8"
+          >
             <Separator />
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="bg-background px-3 text-sm text-muted-foreground">
                 Ou continue com
               </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* Social buttons */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.55, duration: 0.4 }}
+            className="grid grid-cols-2 gap-3 sm:gap-4"
+          >
             <Button variant="outline" className="h-11 text-sm font-medium" onClick={() => console.log('Google login')}>
               <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -139,21 +166,31 @@ const Index = () => {
               </svg>
               GitHub
             </Button>
-          </div>
+          </motion.div>
 
           {/* Footer */}
-          <p className="text-center text-sm text-muted-foreground mt-6 sm:mt-8">
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.65, duration: 0.4 }}
+            className="text-center text-sm text-muted-foreground mt-6 sm:mt-8"
+          >
             Não tem uma conta?{' '}
             <Link to="/cadastro" className="text-primary hover:underline font-medium">
               Cadastre-se
             </Link>
-          </p>
-          <p className="text-center text-sm text-muted-foreground mt-2">
+          </motion.p>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7, duration: 0.4 }}
+            className="text-center text-sm text-muted-foreground mt-2"
+          >
             <Link to="/" className="text-primary hover:underline font-medium">
               ← Voltar para o início
             </Link>
-          </p>
-        </div>
+          </motion.p>
+        </motion.div>
       </div>
     </div>
   );
