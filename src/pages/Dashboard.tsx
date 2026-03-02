@@ -198,7 +198,7 @@ const Dashboard = () => {
               Pro
             </span>
             <span className="hidden sm:inline">
-              {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/^./, (c) => c.toUpperCase())}
+              {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/^./, (c) => c.toUpperCase()).replace(/de (\w)/, (m, c) => 'de ' + c.toUpperCase())}
               {' · '}
             </span>
             <span className="font-medium text-gray-700">
