@@ -143,7 +143,7 @@ const Dashboard = () => {
         </nav>
 
         {/* User */}
-        <div className="p-3">
+        <div className="p-3 space-y-1">
           <div className="flex items-center gap-3 px-2 py-2">
             <Avatar className="w-8 h-8 shrink-0">
               <AvatarFallback className="bg-purple-600/30 text-purple-300 text-xs font-semibold">
@@ -157,6 +157,13 @@ const Dashboard = () => {
               </div>
             )}
           </div>
+          <button
+            onClick={() => window.location.href = "/"}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            <LogOut className="w-5 h-5 shrink-0" />
+            {sidebarOpen && <span>Sair</span>}
+          </button>
         </div>
       </aside>
 
