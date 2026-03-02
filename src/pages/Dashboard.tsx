@@ -265,7 +265,7 @@ const Dashboard = () => {
                   <XAxis dataKey="name" tick={{ fill: "#9ca3af", fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: "#9ca3af", fontSize: 12 }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, color: "#111", fontSize: 13 }} />
-                  <Bar dataKey="tarefas" fill="#a855f7" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="tarefas" fill="hsl(260,60%,8%)" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
