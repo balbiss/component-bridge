@@ -693,6 +693,39 @@ app.post('/api/webhook', async (req, res) => {
             }
         }
 
+        // --- 8.2 Image -> Base64 (Wuzapi Decrypt) ---
+        let imageBase64 = null;
+        if (isImage) {
+            try {
+                console.log(`[WEBHOOK] Baixando arquivo de imagem pela API (Wuzapi Decrypt)...`);
+                const downloadRes = await axios.post(`${wuzapiBase}/chat/downloadimage`, isImage, {
+                    headers: wuzapiHeaders,
+                    responseType: 'json'
+                });
+
+                const resData = downloadRes.data;
+                let b64Data = '';
+
+                // Extração robusta do base64 (mesma lógica do áudio)
+                if (typeof resData === 'string') b64Data = resData;
+                else if (resData?.data && typeof resData.data === 'string') b64Data = resData.data;
+                else if (resData?.base64) b64Data = resData.base64;
+                else if (resData?.file) b64Data = resData.file;
+                else if (resData?.data?.data) b64Data = resData.data.data;
+
+                if (b64Data) {
+                    // Limpa prefixos duplicados se existirem
+                    if (b64Data.includes('base64,')) b64Data = b64Data.split('base64,')[1];
+                    imageBase64 = `data:image/jpeg;base64,${b64Data}`;
+                    console.log(`[WEBHOOK] Imagem baixada e convertida para Base64. Tamanho: ${imageBase64.length} chars`);
+                } else {
+                    console.error('[WEBHOOK] Falha ao extrair base64 da imagem.');
+                }
+            } catch (e) {
+                console.error('[WEBHOOK] Erro ao baixar imagem:', e.response?.data || e.message);
+            }
+        }
+
         // --- 8.5 RECOVERING MEMORY & INJECTING AS CONTEXT ---
         let chatContext = [];
         try {
@@ -737,10 +770,11 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         // Image -> Multimodal
-        if (isImage) {
-            messages[1].content = [
+        if (isImage && imageBase64) {
+            const lastMsg = messages[messages.length - 1];
+            lastMsg.content = [
                 { type: 'text', text: userMessageContent || 'O que você acha desta imagem?' },
-                { type: 'image_url', image_url: { url: isImage.url || '' } }
+                { type: 'image_url', image_url: { url: imageBase64 } }
             ];
         }
 
