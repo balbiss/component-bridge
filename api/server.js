@@ -59,8 +59,15 @@ const wuzapiAdmin = (extraHeaders = {}) =>
 
 // Helper: normalize base64 prefix for Wuzapi
 const normalizeBase64 = (str, forceMime) => {
-    if (typeof str !== 'string') return str;
-    if (!str.startsWith('data:')) return str;
+    if (typeof str !== 'string' || !str) return str;
+
+    // Se não tem prefixo, mas temos um mime forçado, adiciona o prefixo
+    if (!str.startsWith('data:')) {
+        if (forceMime) return `data:${forceMime};base64,${str}`;
+        return str;
+    }
+
+    // Se já tem prefixo e temos um mime forçado, substitui o existente
     if (forceMime) {
         return str.replace(/^data:[^;]+;base64,/, `data:${forceMime};base64,`);
     }
