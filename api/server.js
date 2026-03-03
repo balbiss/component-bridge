@@ -539,28 +539,54 @@ app.post('/api/webhook', async (req, res) => {
                 // Call Wuzapi download endpoint
                 const downloadRes = await axios.post(`${wuzapiBase}/chat/downloadaudio`, isAudio, {
                     headers: wuzapiHeaders,
-                    responseType: 'json' // Try json first, it might return base64 or raw
+                    responseType: 'json'
                 });
 
-                let buffer;
-                if (downloadRes.data && typeof downloadRes.data === 'string' && downloadRes.data.startsWith('data:')) {
-                    // Base64 Data URI
-                    const b64Data = downloadRes.data.split(',')[1] || downloadRes.data;
+                let buffer = null;
+                const resData = downloadRes.data;
+
+                console.log(`[WEBHOOK] Resposta do DownloadAudio: ${typeof resData === 'object' ? JSON.stringify(resData).substring(0, 150) : 'Tipo não-objeto'}`);
+
+                let b64Data = '';
+                if (typeof resData === 'string') {
+                    b64Data = resData;
+                } else if (resData && typeof resData.data === 'string') {
+                    b64Data = resData.data;
+                } else if (resData && typeof resData.base64 === 'string') {
+                    b64Data = resData.base64;
+                } else if (resData && typeof resData.file === 'string') {
+                    b64Data = resData.file;
+                } else if (resData && resData.data && typeof resData.data.data === 'string') {
+                    // Wuzapi often returns { data: { data: "base64..." } }
+                    b64Data = resData.data.data;
+                } else if (resData && resData.data && typeof resData.data === 'object' && !Array.isArray(resData.data)) {
+                    // Just in case there's another nested key
+                    const keys = Object.keys(resData.data);
+                    if (keys.length > 0 && typeof resData.data[keys[0]] === 'string') {
+                        b64Data = resData.data[keys[0]];
+                    }
+                }
+
+                if (b64Data) {
+                    // Remove prefixo data:audio/ogg;base64, se existir
+                    if (b64Data.includes('base64,')) {
+                        b64Data = b64Data.split('base64,')[1];
+                    } else if (b64Data.includes(',')) {
+                        b64Data = b64Data.split(',')[1];
+                    }
                     buffer = Buffer.from(b64Data, 'base64');
-                } else if (downloadRes.data && downloadRes.data.file) {
-                    // JSON with file base64 field (common pattern)
-                    const b64Data = downloadRes.data.file.split(',')[1] || downloadRes.data.file;
-                    buffer = Buffer.from(b64Data, 'base64');
-                } else if (downloadRes.data && typeof downloadRes.data === 'string') {
-                    // Raw base64 or binary string
-                    buffer = Buffer.from(downloadRes.data, 'base64');
                 } else {
+                    console.log(`[WEBHOOK] Falha ao extrair base64. ResData completo: ${JSON.stringify(resData).substring(0, 300)}`);
                     // Try ArrayBuffer fallback if we got raw binary
                     const rawDownload = await axios.post(`${wuzapiBase}/chat/downloadaudio`, isAudio, {
                         headers: wuzapiHeaders,
                         responseType: 'arraybuffer'
                     });
-                    buffer = Buffer.from(rawDownload.data);
+
+                    if (rawDownload.data && rawDownload.data.byteLength > 100) {
+                        buffer = Buffer.from(rawDownload.data);
+                        console.log(`[WEBHOOK] Fallback para ArrayBuffer funcionou. Tamanho: ${buffer.length}`);
+                    }
                 }
 
                 if (buffer && buffer.length > 0) {
