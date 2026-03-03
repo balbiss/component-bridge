@@ -656,15 +656,16 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
     const normalizeJid = (jid) => {
         if (!jid) return jid;
         let clean = jid.split('@')[0].replace(/[^0-9]/g, '');
-        // Se é Brasil (55) e tem 13 dígitos (com o 9 extra), tenta normalizar para 12
+        // Se é Brasil (55) e tem 13 dígitos (com o 9 extra)
         if (clean.startsWith('55') && clean.length === 13) {
             const ddd = parseInt(clean.substring(2, 4));
-            if (ddd >= 11 && ddd <= 28) { // DDDs que geralmente usam o 9 no zap (SP/RJ/ES/MG)
+            // DDDs que quase sempre usam o 9 no JID do WhatsApp (Sul/Sudeste + Para 91)
+            if ((ddd >= 11 && ddd <= 28) || (ddd === 91)) {
                 return `${clean}@s.whatsapp.net`;
             }
-            // Para outros (como 91), o WhatsApp costuma usar a versão sem o 9 (12 dígitos)
+            // Para outros, tentamos o formato de 12 dígitos (removendo o 9 extra após o 55+DDD)
             const withoutNine = clean.substring(0, 4) + clean.substring(5);
-            console.log(`[HANDOVER-NORM] Normalizando JID: ${clean} -> ${withoutNine}`);
+            console.log(`[HANDOVER-NORM] Sugerindo 12 dígitos para DDD ${ddd}: ${withoutNine}`);
             return `${withoutNine}@s.whatsapp.net`;
         }
         return jid.includes('@') ? jid : `${clean}@s.whatsapp.net`;
@@ -717,36 +718,45 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
             const normalizedLead = normalizeJid(remoteJid);
             console.log(`[HANDOVER] Verificando se o destino está no WhatsApp: ${normalizedTarget}`);
 
-            // --- NOVO: VALIDAÇÃO DE NÚMERO ---
+            // --- NOVO: VALIDAÇÃO DE NÚMERO COM RETRY ---
+            let isValid = false;
             try {
-                const checkRes = await wuzCall('POST', '/user/check', {
-                    Phone: [normalizedTarget.split('@')[0]]
-                }, wuzapiHeaders);
+                const checkRes = await wuzCall('POST', '/user/check', { Phone: [normalizedTarget.split('@')[0]] }, wuzapiHeaders);
+                isValid = checkRes.data?.Users?.[0]?.IsInWhatsapp;
 
-                const userData = checkRes.data?.Users?.[0];
-                if (!userData?.IsInWhatsapp) {
-                    console.error(`[HANDOVER-VAL] ATENÇÃO: O número de destino ${normalizedTarget} NÃO possui WhatsApp. Abortando notificação.`);
-                    // Fallback para admin se o atendente falhar (e se o alvo já não for o admin)
+                // Se falhou e tinha 12 dígitos, tenta com 13 (adicionando o 9 de volta)
+                if (!isValid && normalizedTarget.length === 27) { // 55 + DDD + 8 extras = 12 chars
+                    const withNine = normalizedTarget.substring(0, 4) + '9' + normalizedTarget.substring(4);
+                    console.log(`[HANDOVER-VAL] Falha com 12 dígitos. Tentando retry com 13: ${withNine}`);
+                    const retryRes = await wuzCall('POST', '/user/check', { Phone: [withNine.split('@')[0]] }, wuzapiHeaders);
+                    if (retryRes.data?.Users?.[0]?.IsInWhatsapp) {
+                        targetPhone = withNine;
+                        isValid = true;
+                    }
+                }
+
+                if (!isValid) {
+                    console.error(`[HANDOVER-VAL] ATENÇÃO: O número ${normalizedTarget} NÃO possui WhatsApp.`);
+                    // Fallback para admin se o atendente falhar
                     if (attendantId && instance.notification_phone && targetPhone !== instance.notification_phone) {
                         console.log(`[HANDOVER-VAL] Tentando fallback para Telefone Admin: ${instance.notification_phone}`);
                         const normalizedAdmin = normalizeJid(instance.notification_phone);
                         const checkAdmin = await wuzCall('POST', '/user/check', { Phone: [normalizedAdmin.split('@')[0]] }, wuzapiHeaders);
                         if (checkAdmin.data?.Users?.[0]?.IsInWhatsapp) {
                             targetPhone = instance.notification_phone;
-                            // Recomeça o processo de envio com o admin (simplificado aqui)
-                        } else {
-                            return false; // Ambos falharam
+                            isValid = true;
                         }
-                    } else {
-                        return false;
                     }
                 }
             } catch (vError) {
-                console.warn(`[HANDOVER-VAL] Falha ao validar número via Wuzapi: ${vError.message}. Prosseguindo mesmo assim.`);
+                console.warn(`[HANDOVER-VAL] Falha na validação: ${vError.message}. Prosseguindo por fé.`);
+                isValid = true;
             }
 
+            if (!isValid) return false;
+
             const finalTarget = normalizeJid(targetPhone);
-            console.log(`[HANDOVER] Alvos Normalizados - Atendente/Admin: ${finalTarget}, Lead: ${normalizedLead}`);
+            const finalLead = normalizeJid(remoteJid);
 
             // 4. Send notification via Wuzapi to the ATTENDANT or ADMIN
             const notificationText = `*🚨 [NOTIFICAÇÃO DE HANDOVER] 🚨*\n\n*Lead:* ${pushName} (${remoteJid})\n\n*Resumo da Conversa:*\n${summary}\n\n_A IA foi pausada para este contato._`;
@@ -1050,7 +1060,12 @@ app.post('/api/webhook', async (req, res) => {
         console.log(`[HANDOVER-DEBUG] Triggers Normalizados: [${triggers.join(', ')}]`);
         console.log(`[HANDOVER-DEBUG] Mensagem do Usuário (Lower): "${userMsgLower}"`);
 
-        const hasTrigger = triggers.some(t => userMsgLower.includes(t));
+        const hasTrigger = triggers.some(t => {
+            const cleanT = t.toLowerCase().trim();
+            if (!cleanT) return false;
+            // Se for uma palavra curta, busca exata ou dentro da frase
+            return userMsgLower.includes(cleanT);
+        });
         console.log(`[HANDOVER-DEBUG] Resultado hasTrigger: ${hasTrigger}`);
 
         if (hasTrigger) {
@@ -1094,7 +1109,12 @@ app.post('/api/webhook', async (req, res) => {
         // --- 9.5 SMART HANDOVER DETECTION ---
         if (aiResponse.includes('[HANDOVER]')) {
             console.log(`[HANDOVER] Intent Inteligente detectado pela IA. Iniciando transição...`);
-            await executeHandover(instance, remoteJid, pushName, messages, wuzapiHeaders);
+            const success = await executeHandover(instance, remoteJid, pushName, messages, wuzapiHeaders);
+            if (!success) {
+                // Mesmo que falhe notificar o humano, garantimos que o lead receba uma resposta e a IA seja pausada
+                const errorMsg = `Entendi. Estou tentando falar com um atendente agora. Por favor, aguarde um momento que logo entraremos em contato! 🤝`;
+                await wuzCall('POST', '/chat/send/text', { Phone: remoteJid, Body: errorMsg }, wuzapiHeaders);
+            }
             return;
         }
 
