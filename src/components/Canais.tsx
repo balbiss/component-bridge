@@ -323,6 +323,37 @@ const Canais = () => {
         }
     };
 
+    // --- Leads em Atendimento Functions ---
+    const openLeadsModal = async (instance: any) => {
+        setEditingLeadsInstance(instance);
+        setShowLeadsModal(true);
+        fetchHandoverLeads(instance.id);
+    };
+
+    const fetchHandoverLeads = async (instanceId: string) => {
+        setLoadingLeads(true);
+        try {
+            const headers = await getAuthHeader();
+            const { data } = await axios.get(`${API}/instances/${instanceId}/handover/leads`, { headers });
+            setHandoverLeads(data);
+        } catch (err: any) {
+            toast.error("Erro ao buscar leads pausados");
+        } finally {
+            setLoadingLeads(false);
+        }
+    };
+
+    const reactivateAI = async (instanceId: string, jid: string) => {
+        try {
+            const headers = await getAuthHeader();
+            await axios.post(`${API}/instances/${instanceId}/handover/leads/${jid}/reactivate`, {}, { headers });
+            toast.success("IA Reativada para este contato! 🤖✅");
+            fetchHandoverLeads(instanceId);
+        } catch (err: any) {
+            toast.error("Erro ao reativar IA");
+        }
+    };
+
     // ── Loading screen ─────────────────────────────────────────
     if (loading) {
         return (
