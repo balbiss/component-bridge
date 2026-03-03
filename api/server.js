@@ -472,12 +472,15 @@ app.post('/api/webhook', async (req, res) => {
             messageObj.imageMessage?.caption ||
             messageObj.videoMessage?.caption || '';
 
-        if (!bodyText) {
-            console.log(`[WEBHOOK] Nenhum texto localizado (bodyText vazio). Saindo.`);
+        const isAudio = messageObj.audioMessage || messageObj.pttMessage;
+        const isImage = messageObj.imageMessage;
+
+        if (!bodyText && !isAudio && !isImage) {
+            console.log(`[WEBHOOK] Mensagem não textual, não áudio e não imagem. Saindo.`);
             return;
         }
 
-        console.log(`[WEBHOOK] Texto extraído: "${bodyText.substring(0, 20)}...". Buscando instância do DB...`);
+        console.log(`[WEBHOOK] Mensagem detectada (Tamanho original: ${bodyText.length} chars, Audio: ${!!isAudio}, Imagem: ${!!isImage}). Buscando instância DB...`);
 
         // 4. Identify instance by wuzapi_token (sent as 'token' in webhook body by Wuzapi)
         const { data: instance, error } = await supabaseAdmin
@@ -521,10 +524,9 @@ app.post('/api/webhook', async (req, res) => {
 
         console.log(`[WEBHOOK] Construindo conversação base do ChatGPT...`);
         // 8. Handle Content (Multimodal & Audio)
-        let userMessageContent = body;
+        let userMessageContent = bodyText;
 
         // Audio -> Transcription (Whisper)
-        const isAudio = messageObj.audioMessage || messageObj.pttMessage;
         if (isAudio) {
             try {
                 // Indicate "recording" status
@@ -561,7 +563,6 @@ app.post('/api/webhook', async (req, res) => {
         ];
 
         // Image -> Multimodal
-        const isImage = messageObj.imageMessage;
         if (isImage) {
             messages[1].content = [
                 { type: 'text', text: userMessageContent || 'O que você acha desta imagem?' },
