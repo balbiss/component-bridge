@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { supabase } from '@/lib/supabase';
 
-const API = 'http://localhost:3002/api';
+const API = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:3003/api';
 
 async function getAuthHeader() {
     const { data: { session } } = await supabase.auth.getSession();
