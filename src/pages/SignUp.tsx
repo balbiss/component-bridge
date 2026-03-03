@@ -8,18 +8,67 @@ import ShaderBackground from '@/components/ui/shader-background';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
+import { useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+
 const SignUp = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  // Redireciona se já estiver logado
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+
     setIsLoading(true);
-    console.log('Sign up:', { name, email, password });
-    setTimeout(() => setIsLoading(false), 1000);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+          }
+        }
+      });
+
+      if (error) {
+        toast.error(error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        toast.success('Cadastro realizado! Verifique seu e-mail ou faça login.');
+        // Se o email confirmation estiver desligado, o onAuthStateChange 
+        // vai disparar e o useEffect acima vai redirecionar.
+        // Se estiver ligado, o usuário precisa ir pro login.
+        if (data.session) {
+          navigate('/dashboard');
+        } else {
+          navigate('/login');
+        }
+      }
+    } catch (error: any) {
+      toast.error('Erro ao realizar cadastro. Tente novamente.');
+      console.error('Sign up error:', error);
+      setIsLoading(false);
+    }
   };
 
   return (

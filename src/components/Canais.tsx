@@ -1,0 +1,692 @@
+import React, { useState, useEffect, useCallback } from "react";
+import {
+    Link2, RefreshCw, Smartphone, XCircle, Plus, Loader2, QrCode,
+    Trash2, MessageCircle, Activity, Settings, Send, Bot, Users, Target, ClipboardList
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
+import axios from "axios";
+import { supabase } from "@/lib/supabase";
+import { MassDispatch } from "./MassDispatch";
+
+// ── API local (Express) ──────────────────────────────────────────
+const API = "http://localhost:3003/api";
+
+async function getAuthHeader() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error("Sessão expirada. Faça login novamente.");
+    return { Authorization: `Bearer ${session.access_token}` };
+}
+
+// ────────────────────────────────────────────────────────────────
+const Canais = () => {
+    const [instances, setInstances] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [lastSync, setLastSync] = useState(Date.now());
+    const [secondsAgo, setSecondsAgo] = useState(0);
+    const [newName, setNewName] = useState("");
+    const [creating, setCreating] = useState(false);
+    const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
+    const [qrCode, setQrCode] = useState("");
+    const [qrLoading, setQrLoading] = useState(false);
+    const [showPairingInput, setShowPairingInput] = useState(false);
+    const [phoneNumber, setPhoneNumber] = useState("");
+    const [pairingCode, setPairingCode] = useState("");
+    const [massDispatchInstance, setMassDispatchInstance] = useState<any | null>(null);
+    const [showPromptModal, setShowPromptModal] = useState(false);
+    const [editingAIInstance, setEditingAIInstance] = useState<any | null>(null);
+    const [tempPrompt, setTempPrompt] = useState("");
+    const [tempDelayMin, setTempDelayMin] = useState(2000);
+    const [tempDelayMax, setTempDelayMax] = useState(5000);
+    const [savingAI, setSavingAI] = useState(false);
+
+    // ── Buscar instâncias ──────────────────────────────────────
+    const fetchInstances = useCallback(async () => {
+        try {
+            const headers = await getAuthHeader();
+            const { data } = await axios.get(`${API}/instances`, { headers });
+            if (Array.isArray(data)) setInstances(data);
+            setLastSync(Date.now());
+        } catch (err: any) {
+            console.warn("[Canais] Erro ao sincronizar:", err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Carga inicial
+    useEffect(() => { fetchInstances(); }, [fetchInstances]);
+
+    // Polling a cada 5s (menos spam no console)
+    useEffect(() => {
+        const interval = setInterval(fetchInstances, 5000);
+        return () => clearInterval(interval);
+    }, [fetchInstances]);
+
+    // Contador de "há X segundos"
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setSecondsAgo(Math.floor((Date.now() - lastSync) / 1000));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [lastSync]);
+
+    // Fechar modal quando instância conectar
+    useEffect(() => {
+        if (!selectedInstance) return;
+        const inst = instances.find((i: any) => i.id === selectedInstance);
+        if (inst?.status === "connected") {
+            setQrCode("");
+            setPairingCode("");
+            setShowPairingInput(false);
+            setSelectedInstance(null);
+            toast.success(`WhatsApp "${inst.name}" conectado com sucesso! ✅`);
+        }
+    }, [instances, selectedInstance]);
+
+    // ── Criar instância ────────────────────────────────────────
+    const createInstance = async () => {
+        if (!newName.trim()) return toast.error("Digite um nome para a conexão");
+        setCreating(true);
+        try {
+            const headers = await getAuthHeader();
+            await axios.post(`${API}/instances`, { name: newName.trim() }, { headers });
+            setNewName("");
+            await fetchInstances();
+            toast.success("Conexão criada com sucesso! 🎉");
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Erro ao criar conexão");
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    // ── QR Code ────────────────────────────────────────────────
+    const fetchQRCode = async (instanceId: string) => {
+        setSelectedInstance(instanceId);
+        setQrLoading(true);
+        setQrCode("");
+        try {
+            const headers = await getAuthHeader();
+            const { data } = await axios.get(`${API}/instances/${instanceId}/qr`, { headers });
+            if (data?.data?.QRCode) {
+                setQrCode(data.data.QRCode);
+            } else if (data?.connected) {
+                toast.info("WhatsApp já está conectado.");
+                setSelectedInstance(null);
+            } else {
+                toast.warning("Nenhum QR Code disponível. Tente novamente.");
+            }
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Erro ao buscar QR Code");
+        } finally {
+            setQrLoading(false);
+        }
+    };
+
+    // ── Código de Pareamento ───────────────────────────────────
+    const fetchPairingCode = async () => {
+        if (!phoneNumber.trim()) return toast.error("Digite o número com DDI+DDD");
+        const cleanPhone = phoneNumber.replace(/[^0-9]/g, "");
+        setQrLoading(true);
+        try {
+            const headers = await getAuthHeader();
+            const { data } = await axios.post(
+                `${API}/instances/${selectedInstance}/pair`,
+                { phone: cleanPhone },
+                { headers }
+            );
+            const code = data?.data?.LinkingCode || data?.linkingCode;
+            if (code) {
+                setPairingCode(code);
+                setShowPairingInput(false);
+            } else {
+                toast.warning("Código não retornado. Verifique o número e tente novamente.");
+            }
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Erro ao gerar código de pareamento");
+        } finally {
+            setQrLoading(false);
+        }
+    };
+
+    // ── Logout ─────────────────────────────────────────────────
+    const logoutInstance = async (instanceId: string) => {
+        try {
+            const headers = await getAuthHeader();
+            await axios.post(`${API}/instances/${instanceId}/logout`, {}, { headers });
+            toast.success("Sessão encerrada");
+            fetchInstances();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Erro ao desconectar");
+        }
+    };
+
+    // ── Deletar ────────────────────────────────────────────────
+    const deleteInstance = async (instanceId: string) => {
+        if (!window.confirm("Tem certeza que deseja deletar permanentemente esta conexão?")) return;
+        try {
+            const headers = await getAuthHeader();
+            await axios.delete(`${API}/instances/${instanceId}`, { headers });
+            toast.success("Conexão removida!");
+            setInstances(prev => prev.filter(i => i.id !== instanceId));
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Falha ao deletar");
+        }
+    };
+
+    // ── Salvar Config IA ──────────────────────────────────────────
+    const updateAIConfig = async () => {
+        if (!editingAIInstance) return;
+        setSavingAI(true);
+        try {
+            const headers = await getAuthHeader();
+            const url = `${API}/instances/${editingAIInstance.id}/prompt`;
+            console.log("[DEBUG] Salvando prompt em:", url);
+            await axios.post(url, {
+                system_prompt: tempPrompt,
+                ai_delay_min: tempDelayMin,
+                ai_delay_max: tempDelayMax
+            }, { headers });
+
+            toast.success("Configurações da IA atualizadas! 🤖✨");
+            setShowPromptModal(false);
+            fetchInstances();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Erro ao salvar configurações");
+        } finally {
+            setSavingAI(false);
+        }
+    };
+
+
+    // ── Toggle AI Agent ──────────────────────────────────────────
+    const toggleAIAgent = async (instance: any) => {
+        try {
+            const newStatus = !instance.ai_active;
+            const headers = await getAuthHeader();
+            await axios.post(`${API}/instances/${instance.id}/ai`, { ai_active: newStatus }, { headers });
+
+            toast.success(`Agente IA ${newStatus ? 'Ativado' : 'Desativado'}! 🤖`);
+
+            // Update local state to avoid full refetch immediately
+            setInstances(prev => prev.map(i => i.id === instance.id ? { ...i, ai_active: newStatus } : i));
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Erro ao alterar Agente IA");
+        }
+    };
+
+    // ── Abrir Modal de Edição de IA ──────────────────────────────
+    const openAIModal = (instance: any) => {
+        setEditingAIInstance(instance);
+        setTempPrompt(instance.system_prompt || "");
+        setTempDelayMin(instance.ai_delay_min || 2000);
+        setTempDelayMax(instance.ai_delay_max || 5000);
+        setShowPromptModal(true);
+    };
+
+    // ── Loading screen ─────────────────────────────────────────
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+            </div>
+        );
+    }
+
+    // ── Tela de Disparo em Massa ───────────────────────────────
+    if (massDispatchInstance) {
+        return (
+            <MassDispatch
+                instance={massDispatchInstance}
+                onClose={() => setMassDispatchInstance(null)}
+            />
+        );
+    }
+
+    // ── Main render ────────────────────────────────────────────
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Canais / Conexões</h1>
+                    <p className="text-gray-500 text-sm">Gerencie suas conexões de WhatsApp e API.</p>
+                </div>
+                <div className="flex gap-2">
+                    <Input
+                        placeholder="Nome da conexão (ex: Suporte)"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && createInstance()}
+                        className="w-64"
+                    />
+                    <Button onClick={createInstance} disabled={creating} className="bg-purple-600 hover:bg-purple-700">
+                        {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                        Nova Conexão
+                    </Button>
+                </div>
+            </div>
+
+            {/* Grid de cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-12">
+                {instances.map((instance) => (
+                    <InstanceCard
+                        key={instance.id}
+                        instance={instance}
+                        secondsAgo={secondsAgo}
+                        onDelete={deleteInstance}
+                        onLogout={logoutInstance}
+                        onGetQR={fetchQRCode}
+                        onPairing={(id) => {
+                            setSelectedInstance(id);
+                            setShowPairingInput(true);
+                            setPhoneNumber("");
+                        }}
+                        onMassDispatch={setMassDispatchInstance}
+                        onToggleAI={toggleAIAgent}
+                        onEditAI={openAIModal}
+                    />
+                ))}
+            </div>
+
+            {/* Empty state */}
+            {instances.length === 0 && (
+                <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Link2 className="w-8 h-8 text-gray-300" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900">Nenhuma conexão ativa</h3>
+                    <p className="text-gray-500 max-w-xs mx-auto mt-1">Crie sua primeira conexão para começar a enviar mensagens via API.</p>
+                </div>
+            )}
+
+            {/* Modal: Carregando QR */}
+            {selectedInstance && qrLoading && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white p-8 rounded-2xl max-w-sm w-full text-center">
+                        <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto mb-4" />
+                        <h3 className="text-lg font-bold">Gerando...</h3>
+                        <p className="text-gray-500 text-sm mt-2">Isso pode levar alguns segundos.</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: QR Code */}
+            {/* Existing QR Modal content... */}
+
+            {/* Modal: Editar AI Prompt */}
+            {showPromptModal && editingAIInstance && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-purple-100 flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
+                                    <Bot className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold">Personalizar Agente IA</h3>
+                                    <p className="text-purple-100 text-xs mt-0.5">Defina como a IA deve se comportar para: {editingAIInstance.name}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowPromptModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                <XCircle className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto space-y-6">
+                            {/* System Prompt Section */}
+                            <div className="space-y-3">
+                                <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                                    <ClipboardList className="w-4 h-4 text-purple-600" />
+                                    System Prompt (O Cérebro do Agente)
+                                </label>
+                                <div className="relative group">
+                                    <textarea
+                                        value={tempPrompt}
+                                        onChange={(e) => setTempPrompt(e.target.value)}
+                                        placeholder="Ex: Você é o suporte da empresa X, seja educado e tente agendar uma reunião..."
+                                        className="w-full min-h-[180px] p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none text-sm text-gray-700 leading-relaxed resize-none"
+                                    />
+                                    <div className="absolute top-4 right-4 text-[10px] font-bold text-gray-400 bg-white px-2 py-1 rounded-md border border-gray-100 uppercase tracking-wider">Instruções</div>
+                                </div>
+                                <p className="text-[11px] text-gray-400 flex items-start gap-1.5 px-1 leading-normal">
+                                    <Settings className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                    Dica: Especifique o tom de voz, o nome da empresa e os objetivos principais da conversa aqui.
+                                </p>
+                            </div>
+
+                            {/* Delay Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                <div className="space-y-2.5">
+                                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wide px-1">Delay Mínimo (ms)</label>
+                                    <div className="relative group">
+                                        <Input
+                                            type="number"
+                                            value={tempDelayMin}
+                                            onChange={(e) => setTempDelayMin(parseInt(e.target.value))}
+                                            className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:border-purple-500 transition-all font-mono"
+                                        />
+                                        <div className="absolute right-3 top-3.5 text-[10px] font-bold text-gray-400 uppercase">ms</div>
+                                    </div>
+                                </div>
+                                <div className="space-y-2.5">
+                                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wide px-1">Delay Máximo (ms)</label>
+                                    <div className="relative group">
+                                        <Input
+                                            type="number"
+                                            value={tempDelayMax}
+                                            onChange={(e) => setTempDelayMax(parseInt(e.target.value))}
+                                            className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:border-purple-500 transition-all font-mono"
+                                        />
+                                        <div className="absolute right-3 top-3.5 text-[10px] font-bold text-gray-400 uppercase">ms</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50 flex items-start gap-3">
+                                <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600">
+                                    <Activity className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-bold text-blue-800">Humanização Ativa</h4>
+                                    <p className="text-[11px] text-blue-600/80 mt-0.5">A IA vai escolher um tempo aleatório entre o mínimo e o máximo para responder, simulando o tempo de leitura real.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-6 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-3">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setShowPromptModal(false)}
+                                className="rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors"
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={updateAIConfig}
+                                disabled={savingAI}
+                                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold h-12 px-8 rounded-xl shadow-xl shadow-purple-200 min-w-[140px]"
+                            >
+                                {savingAI ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar Agente"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {qrCode && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-2xl font-bold">QR Code</h3>
+                            <Button variant="ghost" size="icon" onClick={() => { setQrCode(""); setSelectedInstance(null); }}>
+                                <XCircle className="w-6 h-6 text-gray-400" />
+                            </Button>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl border-2 border-purple-100 mb-6 flex justify-center">
+                            <img src={qrCode} alt="WhatsApp QR Code" className="w-64 h-64 object-contain" />
+                        </div>
+                        <p className="text-sm text-gray-500 px-2">
+                            Abra o WhatsApp → Configurações → Dispositivos Conectados → Conectar um dispositivo.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Input número para pareamento */}
+            {showPairingInput && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white p-8 rounded-2xl max-w-sm w-full shadow-2xl space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-xl font-bold">Emparelhar via Número</h3>
+                            <Button variant="ghost" size="icon" onClick={() => setShowPairingInput(false)}>
+                                <XCircle className="w-6 h-6 text-gray-400" />
+                            </Button>
+                        </div>
+                        <p className="text-sm text-gray-500">Digite seu número com DDI e DDD (ex: 5511999999999).</p>
+                        <Input
+                            placeholder="Ex: 5511999999999"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && fetchPairingCode()}
+                            className="text-base h-11"
+                        />
+                        <Button
+                            onClick={fetchPairingCode}
+                            className="w-full bg-blue-600 hover:bg-blue-700 h-11"
+                            disabled={qrLoading}
+                        >
+                            {qrLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                            Gerar Código
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Exibir código de pareamento */}
+            {pairingCode && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold">Código Gerado</h3>
+                            <Button variant="ghost" size="icon" onClick={() => { setPairingCode(""); setSelectedInstance(null); }}>
+                                <XCircle className="w-6 h-6 text-gray-400" />
+                            </Button>
+                        </div>
+                        <div className="bg-gray-50 p-6 rounded-xl border-2 border-dashed border-gray-300 mb-6 flex items-center justify-center">
+                            <span className="text-4xl font-mono tracking-widest font-bold text-gray-900 break-all">{pairingCode}</span>
+                        </div>
+                        <p className="text-sm text-gray-500 px-2">
+                            Abra o WhatsApp → Dispositivos Conectados → Conectar usando número de telefone.
+                        </p>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ── Instance Card ────────────────────────────────────────────────
+interface InstanceCardProps {
+    instance: any;
+    secondsAgo: number;
+    onDelete: (id: string) => void;
+    onLogout: (id: string) => void;
+    onGetQR: (id: string) => void;
+    onPairing: (id: string) => void;
+    onMassDispatch: (instance: any) => void;
+    onToggleAI: (instance: any) => void;
+    onEditAI: (instance: any) => void;
+}
+
+const InstanceCard = ({ instance, secondsAgo, onDelete, onLogout, onGetQR, onPairing, onMassDispatch, onToggleAI, onEditAI }: InstanceCardProps) => {
+    const [showMenu, setShowMenu] = useState(false);
+    const [showAIMenu, setShowAIMenu] = useState(false);
+
+    const menuItems = [
+        { icon: Send, label: "DISPARO EM MASSA", color: "text-blue-600", action: () => { onMassDispatch(instance); setShowMenu(false); } },
+        { icon: Bot, label: "AGENTE DE IA", color: "text-purple-600", action: () => { setShowAIMenu(true); } },
+        { icon: Users, label: "RODÍZIO DE ATENDIMENTO", color: "text-green-600", action: () => toast.info("Em breve: " + instance.name) },
+        { icon: Target, label: "LEADS EM ATENDIMENTO", color: "text-orange-600", action: () => toast.info("Em breve: " + instance.name) },
+    ];
+
+    const aiMenuItems = [
+        {
+            label: instance.ai_active ? "Desativar IA" : "Ativar IA",
+            emoji: instance.ai_active ? "🔴" : "🟢",
+            action: () => {
+                onToggleAI(instance);
+                setShowAIMenu(false);
+            }
+        },
+        {
+            label: "Editar System Prompt",
+            emoji: "📝",
+            action: () => {
+                onEditAI(instance);
+                setShowAIMenu(false);
+            }
+        },
+        { label: "Temas para Humano", emoji: "🤝" },
+        { label: "Base de Conhecimento (PDF)", emoji: "📚" },
+        { label: "Tempo de Reativação", emoji: "🕓" },
+        { label: "Follow-ups", emoji: "🔔" },
+    ];
+
+    return (
+        <Card className="w-full shadow-2xl border-0 bg-white group relative overflow-hidden h-fit transition-all duration-300 hover:shadow-purple-100/50">
+            <div className={`absolute -inset-0.5 rounded-2xl blur opacity-0 group-hover:opacity-10 transition duration-1000 pointer-events-none ${instance.ai_active ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-purple-600 to-blue-600'}`} />
+
+            <CardContent className="p-4 relative">
+                {/* Avatar + Info */}
+                <div className="flex items-start justify-between mb-5">
+                    <div className="flex items-start gap-4">
+                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center shadow-lg relative shrink-0 ${instance.ai_active ? 'bg-gradient-to-br from-emerald-400 to-teal-600' : 'bg-gradient-to-br from-purple-500 to-purple-700'}`}>
+                            {instance.avatarUrl ? (
+                                <img src={instance.avatarUrl} alt="Avatar" className="w-full h-full object-cover rounded-xl" />
+                            ) : (
+                                <MessageCircle className="w-8 h-8 text-white" strokeWidth={2} />
+                            )}
+                            {instance.status === "connected" && (
+                                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-white flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="text-lg font-bold text-gray-900 mb-0.5 truncate">{instance.name}</h3>
+                            <p className="text-xs text-gray-500 mb-1.5 truncate">
+                                {instance.status === "connected" && instance.phone ? `+${instance.phone}` : "Aguardando Conexão"}
+                            </p>
+
+                            {instance.ai_active && (
+                                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[9px] px-1.5 py-0 mb-1.5 font-bold uppercase tracking-wider h-4 flex w-fit items-center gap-1 shadow-sm">
+                                    <Bot className="w-2.5 h-2.5" />
+                                    Agente IA Ativado
+                                </Badge>
+                            )}
+
+                            <div className="flex items-center gap-1.5">
+                                <Activity className={`w-3 h-3 ${secondsAgo < 6 ? "text-green-500" : "text-gray-400"}`} />
+                                <span className="text-[10px] font-medium text-gray-500">
+                                    {secondsAgo === 0 ? "Sincronizando..." : `Há ${secondsAgo}s`}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5">
+                        <Badge className={`text-[10px] h-5 px-1.5 ${instance.status === "connected" ? "bg-green-100 text-green-700 hover:bg-green-100 border-0 font-semibold shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-100 border-0 font-semibold shadow-sm"}`}>
+                            {instance.status === "connected" ? "Conectado" : "Desconectado"}
+                        </Badge>
+                        <Button
+                            variant="ghost" size="icon"
+                            className="h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                            onClick={(e) => { e.stopPropagation(); onDelete(instance.id); }}
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col gap-2.5">
+                    {instance.status !== "connected" ? (
+                        <>
+                            <Button
+                                className="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold h-10 shadow-lg shadow-purple-200 text-xs"
+                                onClick={() => onGetQR(instance.id)}
+                            >
+                                <QrCode className="w-3.5 h-3.5 mr-2" /> Gerar QR Code
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="w-full border-blue-100 text-blue-600 hover:bg-blue-50 h-10 font-bold text-xs"
+                                onClick={() => onPairing(instance.id)}
+                            >
+                                <Smartphone className="w-3.5 h-3.5 mr-2" /> Código de Pareamento
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button
+                                className="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold h-10 text-xs"
+                                onClick={() => { setShowMenu(!showMenu); setShowAIMenu(false); }}
+                            >
+                                <Settings className="w-3.5 h-3.5 mr-2" />
+                                {showMenu ? "Recolher Menu" : "Gerenciar Instância"}
+                            </Button>
+
+                            {showMenu && !showAIMenu && (
+                                <div className="w-full bg-white border border-purple-50 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="px-3 py-1.5 text-[9px] font-bold text-purple-400 uppercase tracking-widest bg-purple-50/50">Opções Avançadas</div>
+                                    {menuItems.map((item, i) => (
+                                        <button
+                                            key={i}
+                                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-purple-50/50 transition-colors border-b border-purple-50 last:border-b-0 text-left group"
+                                            onClick={() => item.action()}
+                                        >
+                                            <item.icon className={`w-4 h-4 ${item.color} group-hover:scale-110 transition-transform`} />
+                                            <span className="text-xs font-bold text-gray-700">{item.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {showAIMenu && (
+                                <div className="w-full bg-white border border-purple-100 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="flex items-center justify-between p-2.5 border-b border-purple-50 bg-gradient-to-r from-purple-50 to-white">
+                                        <div className="flex items-center gap-2 text-purple-700">
+                                            <Bot className="w-3.5 h-3.5" />
+                                            <h3 className="font-bold text-xs">Configurar Agente IA</h3>
+                                        </div>
+                                        <button
+                                            onClick={() => { setShowAIMenu(false); setShowMenu(true); }}
+                                            className="p-1 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-full transition-all"
+                                        >
+                                            <XCircle className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <div className="max-h-[250px] overflow-y-auto">
+                                        {aiMenuItems.map((item, i) => (
+                                            <button
+                                                key={i}
+                                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-purple-50 transition-colors border-b border-purple-50 last:border-b-0 text-left group"
+                                                onClick={() => {
+                                                    if (item.action) {
+                                                        item.action();
+                                                    } else {
+                                                        toast.info(`Menu IA: ${item.label}`);
+                                                    }
+                                                }}
+                                            >
+                                                <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center text-base group-hover:bg-white transition-colors">
+                                                    {item.emoji}
+                                                </div>
+                                                <span className="text-xs font-bold text-gray-700">{item.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <Button
+                                variant="outline"
+                                className="w-full text-red-600 border-red-100 hover:bg-red-50 hover:text-red-700 h-9 font-bold text-[11px]"
+                                onClick={() => onLogout(instance.id)}
+                            >
+                                <RefreshCw className="w-3.5 h-3.5 mr-2" /> Desconectar WhatsApp
+                            </Button>
+                        </>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
+export default Canais;

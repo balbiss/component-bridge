@@ -1,0 +1,74 @@
+﻿
+> vite_react_shadcn_ts@0.0.0 lint
+> eslint .
+
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\CampaignHistory.tsx
+  51:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\Canais.tsx
+   26:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   38:70  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   47:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   74:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   94:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  117:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  143:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  157:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  170:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  335:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  341:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\MassDispatch.tsx
+   33:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   99:30  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  166:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\ui\badge.tsx
+  29:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\ui\button.tsx
+  47:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\ui\command.tsx
+  24:11  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\ui\form.tsx
+  129:10  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\ui\navigation-menu.tsx
+  111:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\ui\shader-background.tsx
+  189:6  warning  React Hook useEffect has missing dependencies: 'fsSource', 'initShaderProgram', and 'vsSource'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\ui\sidebar.tsx
+  636:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\ui\sonner.tsx
+  27:19  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\ui\textarea.tsx
+  5:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\components\ui\toggle.tsx
+  37:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\hooks\useAuth.tsx
+    8:14  error    Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+   18:44  error    Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+   56:8   warning  React Hook useEffect has a missing dependency: 'user'. Either include it or remove the dependency array                         react-hooks/exhaustive-deps
+   72:91  error    Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  103:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\pages\Index.tsx
+  61:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\src\pages\SignUp.tsx
+  67:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\tailwind.config.ts
+  90:13  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+Ô£û 33 problems (23 errors, 10 warnings)
+

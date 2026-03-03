@@ -8,18 +8,61 @@ import ShaderBackground from '@/components/ui/shader-background';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
+import { useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+
 const Index = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  // Redireciona se já estiver logado
+  useEffect(() => {
+    console.log('Login Page - Auth State:', { loading, userEmail: user?.email });
+    if (!loading && user) {
+      console.log('User detected in useEffect, redirecting to dashboard...');
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+
     setIsLoading(true);
-    console.log('Login:', { email, password, rememberMe });
-    setTimeout(() => setIsLoading(false), 1000);
+    console.log('Manual login attempt for:', email);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error('Manual login error:', error);
+        toast.error(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos' : error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        console.log('Manual login success, user:', data.user.email);
+        toast.success('Login realizado com sucesso!');
+        // Explicit redirect in case useEffect is slow or stuck
+        setTimeout(() => navigate('/dashboard'), 100);
+      }
+    } catch (error: any) {
+      toast.error('Erro ao realizar login. Tente novamente.');
+      console.error('Unexpected manual login error:', error);
+      setIsLoading(false);
+    }
   };
 
   return (

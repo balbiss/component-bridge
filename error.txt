@@ -1,0 +1,18 @@
+[dotenv@17.3.1] injecting env (2) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\api\node_modules\@supabase\supabase-js\dist\index.cjs:146
+	if (!trimmedUrl) throw new Error("supabaseUrl is required.");
+	                 ^
+
+Error: supabaseUrl is required.
+    at validateSupabaseUrl (C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\api\node_modules\@supabase\supabase-js\dist\index.cjs:146:25)
+    at new SupabaseClient (C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\api\node_modules\@supabase\supabase-js\dist\index.cjs:195:19)
+    at createClient (C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\api\node_modules\@supabase\supabase-js\dist\index.cjs:388:9)
+    at Object.<anonymous> (C:\Users\inoov\Desktop\SAAS INOOVAWEB ANDEROSN BALBIS PRO MEU\component-bridge\api\server.js:18:18)
+    at Module._compile (node:internal/modules/cjs/loader:1706:14)
+    at Object..js (node:internal/modules/cjs/loader:1839:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+
+Node.js v22.19.0

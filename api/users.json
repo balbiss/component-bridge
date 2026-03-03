@@ -1,0 +1,118 @@
+{
+  "code": 200,
+  "data": [
+    {
+      "connected": true,
+      "events": "",
+      "expiration": 0,
+      "id": "c3dfb9370f66cadc3b31c937c975f80d",
+      "jid": "559187245102:27@s.whatsapp.net",
+      "loggedIn": true,
+      "name": "Fabia ",
+      "proxy_config": {
+        "enabled": false,
+        "proxy_url": ""
+      },
+      "proxy_url": "",
+      "qrcode": "",
+      "s3_config": {
+        "access_key": "***",
+        "bucket": "",
+        "enabled": false,
+        "endpoint": "",
+        "media_delivery": "",
+        "path_style": false,
+        "public_url": "",
+        "region": "",
+        "retention_days": 0
+      },
+      "token": "Akm1Ba6wXECk5QT6KteRIXFauzihyL0V",
+      "webhook": ""
+    },
+    {
+      "connected": false,
+      "events": "",
+      "expiration": 0,
+      "id": "8040203fe844810a5f2c2ec37ae75b37",
+      "jid": "5512992391959:4@s.whatsapp.net",
+      "loggedIn": false,
+      "name": "wa_7884044186_4506",
+      "proxy_config": {
+        "enabled": false,
+        "proxy_url": ""
+      },
+      "proxy_url": "",
+      "qrcode": "",
+      "s3_config": {
+        "access_key": "***",
+        "bucket": "",
+        "enabled": false,
+        "endpoint": "",
+        "media_delivery": "",
+        "path_style": false,
+        "public_url": "",
+        "region": "",
+        "retention_days": 0
+      },
+      "token": "wa_7884044186_4506",
+      "webhook": "https://connect.inoovaweb.com.br/webhook"
+    },
+    {
+      "connected": false,
+      "events": "",
+      "expiration": 0,
+      "id": "a8f657b895bc6f922d65f82da57d8ad5",
+      "jid": "559182935558:50@s.whatsapp.net",
+      "loggedIn": false,
+      "name": "wa_7924857149_6272",
+      "proxy_config": {
+        "enabled": false,
+        "proxy_url": ""
+      },
+      "proxy_url": "",
+      "qrcode": "",
+      "s3_config": {
+        "access_key": "***",
+        "bucket": "",
+        "enabled": false,
+        "endpoint": "",
+        "media_delivery": "",
+        "path_style": false,
+        "public_url": "",
+        "region": "",
+        "retention_days": 0
+      },
+      "token": "wa_7924857149_6272",
+      "webhook": "https://connect.inoovaweb.com.br/webhook"
+    },
+    {
+      "connected": false,
+      "events": "",
+      "expiration": 0,
+      "id": "d3d6883f5207a4f2a632f5d0112d8d0b",
+      "jid": "",
+      "loggedIn": false,
+      "name": "suporte",
+      "proxy_config": {
+        "enabled": false,
+        "proxy_url": ""
+      },
+      "proxy_url": "",
+      "qrcode": "",
+      "s3_config": {
+        "access_key": "***",
+        "bucket": "",
+        "enabled": false,
+        "endpoint": "",
+        "media_delivery": "",
+        "path_style": false,
+        "public_url": "",
+        "region": "",
+        "retention_days": 0
+      },
+      "token": "token_9nwg50kpb",
+      "webhook": ""
+    }
+  ],
+  "success": true
+}
