@@ -421,16 +421,22 @@ app.post('/api/instances/:id/prompt', authenticateToken, async (req, res) => {
 
 // GLOBAL WEBHOOK - Process Wuzapi Messages
 app.post('/api/webhook', async (req, res) => {
-    // console.log('--- Webhook Received ---', JSON.stringify(req.body, null, 2));
+    console.log('--- WUZAPI WEBHOOK RECEIVED ---');
+    console.log('Headers:', JSON.stringify(req.headers));
+    console.log('Body:', JSON.stringify(req.body).substring(0, 500)); // Log first 500 chars
 
     // Immediate response to Wuzapi to avoid timeouts
     res.sendStatus(200);
 
     try {
         const { event, data, token } = req.body;
+        console.log(`[WEBHOOK] Event: ${event}, Token in body: ${token}, From: ${data?.from}`);
 
         // 1. Only process "Message" events
-        if (event !== 'Message') return;
+        if (event !== 'Message') {
+            console.log(`[WEBHOOK] Ignoring non-Message event: ${event}`);
+            return;
+        }
 
         // 2. Extract message details
         const msg = data;
