@@ -650,7 +650,7 @@ const Canais = () => {
                                         placeholder="Ex: falar com humano, preço, atendente, ajuda (separados por vírgula)"
                                         className="w-full h-24 p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm"
                                     />
-                                    <p className="text-[10px] text-gray-400">Quando o lead disser qualquer uma dessas palavras, a IA será pausada e o rodízio disparado.</p>
+                                    <p className="text-[10px] text-gray-400">Use palavras-chave separadas por <b>vírgula</b> (ex: suporte, humano, atendente). Frases longas não funcionam bem aqui; a IA agora também detecta o desejo do lead de forma inteligente.</p>
                                 </div>
 
                                 <div className="space-y-2">

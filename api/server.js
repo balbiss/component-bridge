@@ -646,6 +646,83 @@ app.post('/api/instances/:id/handover/leads/:jid/reactivate', authenticateToken,
     }
 });
 
+// ──────────────────────────────────────────────────────────────
+// HUMAN HANDOVER HELPER
+// ──────────────────────────────────────────────────────────────
+async function executeHandover(instance, remoteJid, pushName, messages, wuzapiBase, wuzapiHeaders) {
+    console.log(`[HANDOVER] Iniciando processo de transição para humano... Lead: ${pushName} (${remoteJid})`);
+    try {
+        // 1. Disable AI for this contact
+        await supabaseAdmin.from('ai_disabled_contacts').upsert({
+            instance_id: instance.id,
+            remote_jid: remoteJid,
+            active: true
+        });
+
+        // 2. Generate summary
+        console.log(`[HANDOVER] Gerando resumo da conversa para o atendente...`);
+        const summaryCompletion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+                { role: 'system', content: 'Você é um assistente que resume conversas de WhatsApp para atendentes humanos. Gere um resumo curto e objetivo do que o lead deseja.' },
+                ...messages
+            ]
+        });
+        const summary = summaryCompletion.choices[0].message.content;
+
+        // 3. Find next attendant (Rodízio)
+        const { data: attendants, error: attError } = await supabaseAdmin
+            .from('attendants')
+            .select('*')
+            .eq('instance_id', instance.id)
+            .eq('is_active', true)
+            .order('last_handover_at', { ascending: true, nullsFirst: true });
+
+        let targetPhone = instance.notification_phone;
+        let attendantId = null;
+
+        if (attendants && attendants.length > 0) {
+            const nextAttendant = attendants[0];
+            targetPhone = nextAttendant.phone;
+            attendantId = nextAttendant.id;
+            console.log(`[HANDOVER] Rodízio: Selecionado atendente ${nextAttendant.name} (${targetPhone})`);
+        } else {
+            console.log(`[HANDOVER] Nenhum atendente ativo. Usando telefone admin: ${targetPhone}`);
+        }
+
+        if (targetPhone) {
+            // 4. Send notification via Wuzapi to the ATTENDANT or ADMIN
+            const notificationText = `*🚨 [NOTIFICAÇÃO DE HANDOVER] 🚨*\n\n*Lead:* ${pushName} (${remoteJid})\n\n*Resumo da Conversa:*\n${summary}\n\n_A IA foi pausada para este contato._`;
+
+            await axios.post(`${wuzapiBase}/chat/sendtext`, {
+                Phone: targetPhone,
+                Body: notificationText
+            }, { headers: wuzapiHeaders });
+
+            // --- 4.5 NOTIFY THE LEAD ---
+            const leadTransferMessage = `Entendi, ${pushName}. Estou transferindo sua conversa para um de nossos atendentes agora mesmo. Por favor, aguarde um momento! 🤝`;
+            await axios.post(`${wuzapiBase}/chat/sendtext`, {
+                Phone: remoteJid,
+                Body: leadTransferMessage
+            }, { headers: wuzapiHeaders });
+
+            // 5. Update last_handover_at if we used an attendant
+            if (attendantId) {
+                await supabaseAdmin.from('attendants').update({ last_handover_at: new Date().toISOString() }).eq('id', attendantId);
+            }
+
+            console.log(`[HANDOVER] Notificações enviadas com sucesso.`);
+            return true;
+        } else {
+            console.warn(`[HANDOVER] Falha: Nenhum número de destino configurado.`);
+            return false;
+        }
+    } catch (err) {
+        console.error(`[HANDOVER] Erro fatal no processo:`, err.message);
+        return false;
+    }
+}
+
 // GLOBAL WEBHOOK - Process Wuzapi Messages
 app.post('/api/webhook', async (req, res) => {
     console.log('--- WUZAPI WEBHOOK RECEIVED ---');
@@ -904,8 +981,9 @@ app.post('/api/webhook', async (req, res) => {
             console.error(`[WEBHOOK] Exception ao buscar memória:`, e.message);
         }
 
+        const handoverInstruction = `\n\n[NOTA DO SISTEMA: Se o cliente expressar desejo de falar com suporte, atendente, humano ou se você não souber responder, responda apenas a palavra: [HANDOVER]]`;
         const messages = [
-            { role: 'system', content: `${systemPrompt}\nNome do lead: ${pushName}` },
+            { role: 'system', content: `${systemPrompt}\nNome do lead: ${pushName}${handoverInstruction}` },
             ...chatContext,
             { role: 'user', content: userMessageContent }
         ];
@@ -921,79 +999,8 @@ app.post('/api/webhook', async (req, res) => {
         console.log(`[HANDOVER-DEBUG] Resultado hasTrigger: ${hasTrigger}`);
 
         if (hasTrigger) {
-            console.log(`[HANDOVER] Gatilho detectado: "${userMessageContent}". Iniciando transição para humano...`);
-
-            try {
-                // 1. Disable AI for this contact
-                await supabaseAdmin.from('ai_disabled_contacts').insert({
-                    instance_id: instance.id,
-                    remote_jid: remoteJid,
-                    active: true
-                });
-
-                // 2. Generate summary
-                console.log(`[HANDOVER] Gerando resumo da conversa para o atendente...`);
-                const summaryCompletion = await openai.chat.completions.create({
-                    model: 'gpt-4o-mini',
-                    messages: [
-                        { role: 'system', content: 'Você é um assistente que resume conversas de WhatsApp para atendentes humanos. Gere um resumo curto e objetivo do que o lead deseja.' },
-                        ...messages
-                    ]
-                });
-                const summary = summaryCompletion.choices[0].message.content;
-
-                // 3. Find next attendant (Rodízio)
-                const { data: attendants, error: attError } = await supabaseAdmin
-                    .from('attendants')
-                    .select('*')
-                    .eq('instance_id', instance.id)
-                    .eq('is_active', true)
-                    .order('last_handover_at', { ascending: true, nullsFirst: true });
-
-                let targetPhone = instance.notification_phone;
-                let attendantId = null;
-
-                if (attendants && attendants.length > 0) {
-                    const nextAttendant = attendants[0];
-                    targetPhone = nextAttendant.phone;
-                    attendantId = nextAttendant.id;
-                    console.log(`[HANDOVER] Rodízio: Selecionado atendente ${nextAttendant.name} (${targetPhone})`);
-                } else {
-                    console.log(`[HANDOVER] Nenhum atendente ativo. Usando telefone admin: ${targetPhone}`);
-                }
-
-                if (targetPhone) {
-                    // 4. Send notification via Wuzapi to the ATTENDANT or ADMIN
-                    const notificationText = `*🚨 [NOTIFICAÇÃO DE HANDOVER] 🚨*\n\n*Lead:* ${pushName} (${remoteJid})\n\n*Resumo da Conversa:*\n${summary}\n\n_A IA foi pausada para este contato._`;
-
-                    await axios.post(`${wuzapiBase}/chat/sendtext`, {
-                        Phone: targetPhone,
-                        Body: notificationText
-                    }, { headers: wuzapiHeaders });
-
-                    // --- 4.5 NOTIFY THE LEAD ---
-                    // Send a courtesy message to the customer letting them know they are being transferred
-                    const leadTransferMessage = `Entendi, ${pushName}. Estou transferindo sua conversa para um de nossos atendentes agora mesmo. Por favor, aguarde um momento! 🤝`;
-                    await axios.post(`${wuzapiBase}/chat/sendtext`, {
-                        Phone: remoteJid,
-                        Body: leadTransferMessage
-                    }, { headers: wuzapiHeaders });
-
-                    // 5. Update last_handover_at if we used an attendant
-                    if (attendantId) {
-                        await supabaseAdmin.from('attendants').update({ last_handover_at: new Date().toISOString() }).eq('id', attendantId);
-                    }
-
-                    console.log(`[HANDOVER] Notificações enviadas para atendente (${targetPhone}) e lead (${remoteJid}).`);
-                } else {
-                    console.warn(`[HANDOVER] Falha: Nenhum número de destino (atendente ou admin) configurado.`);
-                }
-
-            } catch (hErr) {
-                console.error(`[HANDOVER] Erro fatal no processo de handover:`, hErr.message);
-            }
-
-            // Exit early - don't let the AI respond to the trigger message
+            console.log(`[HANDOVER] Gatilho literal detectado: "${userMessageContent}".`);
+            await executeHandover(instance, remoteJid, pushName, messages, wuzapiBase, wuzapiHeaders);
             return;
         }
 
@@ -1028,6 +1035,14 @@ app.post('/api/webhook', async (req, res) => {
         });
 
         const aiResponse = completion.choices[0].message.content;
+
+        // --- 9.5 SMART HANDOVER DETECTION ---
+        if (aiResponse.includes('[HANDOVER]')) {
+            console.log(`[HANDOVER] Intent Inteligente detectado pela IA. Iniciando transição...`);
+            await executeHandover(instance, remoteJid, pushName, messages, wuzapiBase, wuzapiHeaders);
+            return;
+        }
+
         console.log(`[WEBHOOK] OpenAI Resposta Txt: ${aiResponse.substring(0, 30)}... Enviando Zap...`);
 
         // --- 10. SAVE AI ASSISTANT MESSAGE TO MEMORY DB ---
