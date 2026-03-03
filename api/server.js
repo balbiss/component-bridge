@@ -489,8 +489,10 @@ app.post('/api/webhook', async (req, res) => {
             .eq('wuzapi_token', token)
             .single();
 
+        console.log(`[WEBHOOK] DB Query result para token "${token}": Error: ${error ? JSON.stringify(error) : 'null'}, Instance found: ${!!instance}, AI Active: ${instance?.ai_active}`);
+
         if (error || !instance || !instance.ai_active) {
-            console.log(`[WEBHOOK] Instância DB não encontrada ou AI inativa para token: ${token?.substring(0, 5)}`);
+            console.log(`[WEBHOOK] Instância DB não encontrada ou AI inativa para token: ${token}. Abortando.`);
             return;
         }
 
@@ -532,27 +534,58 @@ app.post('/api/webhook', async (req, res) => {
                 // Indicate "recording" status
                 await axios.post(`${wuzapiBase}/chat/presence`, { Phone: from, State: 'recording' }, { headers: wuzapiHeaders });
 
-                const audioUrl = isAudio.url;
-                if (audioUrl) {
-                    const response = await axios.get(audioUrl, { responseType: 'arraybuffer' });
-                    const buffer = Buffer.from(response.data);
+                console.log(`[WEBHOOK] Baixando arquivo de áudio pela API (Wuzapi Decrypt)...`);
 
+                // Call Wuzapi download endpoint
+                const downloadRes = await axios.post(`${wuzapiBase}/chat/downloadaudio`, isAudio, {
+                    headers: wuzapiHeaders,
+                    responseType: 'json' // Try json first, it might return base64 or raw
+                });
+
+                let buffer;
+                if (downloadRes.data && typeof downloadRes.data === 'string' && downloadRes.data.startsWith('data:')) {
+                    // Base64 Data URI
+                    const b64Data = downloadRes.data.split(',')[1] || downloadRes.data;
+                    buffer = Buffer.from(b64Data, 'base64');
+                } else if (downloadRes.data && downloadRes.data.file) {
+                    // JSON with file base64 field (common pattern)
+                    const b64Data = downloadRes.data.file.split(',')[1] || downloadRes.data.file;
+                    buffer = Buffer.from(b64Data, 'base64');
+                } else if (downloadRes.data && typeof downloadRes.data === 'string') {
+                    // Raw base64 or binary string
+                    buffer = Buffer.from(downloadRes.data, 'base64');
+                } else {
+                    // Try ArrayBuffer fallback if we got raw binary
+                    const rawDownload = await axios.post(`${wuzapiBase}/chat/downloadaudio`, isAudio, {
+                        headers: wuzapiHeaders,
+                        responseType: 'arraybuffer'
+                    });
+                    buffer = Buffer.from(rawDownload.data);
+                }
+
+                if (buffer && buffer.length > 0) {
+                    console.log(`[WEBHOOK] Áudio decriptado com sucesso! Tamanho: ${buffer.length} bytes`);
                     // Save to temp file for Whisper (OpenAI requires a file-like object with a name)
                     const tempAudioPath = `./temp_audio_${Date.now()}.ogg`;
                     fs.writeFileSync(tempAudioPath, buffer);
 
+                    console.log(`[WEBHOOK] Enviando áudio temporário para OpenAI Whisper...`);
                     const transcription = await openai.audio.transcriptions.create({
                         file: fs.createReadStream(tempAudioPath),
                         model: 'whisper-1',
                     });
 
                     userMessageContent = `[Áudio Transcrito]: ${transcription.text}`;
+                    console.log(`[WEBHOOK] Áudio transcrito com sucesso: ${userMessageContent}`);
 
                     // Cleanup
                     fs.unlinkSync(tempAudioPath);
+                } else {
+                    console.error('[WEBHOOK] Erro: Buffer de áudio baixado está vazio.');
+                    userMessageContent = '[Erro: Arquivo de áudio não pode ser lido]';
                 }
             } catch (e) {
-                console.error('Error transcribing audio:', e.message);
+                console.error('Error transcribing audio:', e.response?.data || e.message);
                 userMessageContent = '[Erro ao processar áudio]';
             }
         }
