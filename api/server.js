@@ -354,16 +354,31 @@ app.post('/api/instances/:id/ai', authenticateToken, async (req, res) => {
             if (webhookUrl) {
                 console.log(`[AI-AUTO] Configurando webhook para instância ${id}: ${webhookUrl}`);
                 try {
-                    await axios.post(`${process.env.WUZAPI_URL}/webhook`, {
-                        url: webhookUrl,
+                    // Try PUT first with Active: true (WebhookUpdate definition)
+                    const payloadUpdate = {
                         webhook: webhookUrl,
-                        events: ['Message']
-                    }, {
+                        events: ['Message'],
+                        Active: true
+                    };
+                    const resPut = await axios.put(`${process.env.WUZAPI_URL}/webhook`, payloadUpdate, {
                         headers: { token: data.wuzapi_token }
                     });
-                    console.log(`[AI-AUTO] Webhook configurado com sucesso para token: ${data.wuzapi_token.substring(0, 5)}...`);
+                    console.log(`[AI-AUTO] Webhook atualizado (PUT) com sucesso para token: ${data.wuzapi_token.substring(0, 5)}...`, resPut.data);
                 } catch (ew) {
-                    console.error(`[AI-AUTO] Erro ao configurar webhook no Wuzapi:`, ew.response?.data || ew.message);
+                    console.error(`[AI-AUTO] Erro no PUT, tentando POST...`, ew.response?.data || ew.message);
+                    try {
+                        // Fallback to POST (WebhookSet definition)
+                        const payloadSet = {
+                            webhook: webhookUrl,
+                            events: ['Message']
+                        };
+                        const resPost = await axios.post(`${process.env.WUZAPI_URL}/webhook`, payloadSet, {
+                            headers: { token: data.wuzapi_token }
+                        });
+                        console.log(`[AI-AUTO] Webhook configurado (POST) com sucesso para token: ${data.wuzapi_token.substring(0, 5)}...`, resPost.data);
+                    } catch (ew2) {
+                        console.error(`[AI-AUTO] Erro fatal ao configurar webhook no Wuzapi:`, ew2.response?.data || ew2.message);
+                    }
                 }
             } else {
                 console.warn(`[AI-AUTO] WEBHOOK_URL não configurada no .env ou é placeholder. Pulando auto-configuração.`);
