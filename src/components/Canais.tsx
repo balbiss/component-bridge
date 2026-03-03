@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import axios from "axios";
 import { supabase } from "@/lib/supabase";
 import { MassDispatch } from "./MassDispatch";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const API = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "http://localhost:3003/api";
 
@@ -52,6 +54,7 @@ const Canais = () => {
     const [newAttPhone, setNewAttPhone] = useState("");
     const [loadingHandover, setLoadingHandover] = useState(false);
     const [savingHandover, setSavingHandover] = useState(false);
+    const [roundRobinActive, setRoundRobinActive] = useState(true);
 
     // --- Leads em Atendimento ---
     const [showLeadsModal, setShowLeadsModal] = useState(false);
@@ -260,6 +263,7 @@ const Canais = () => {
         setEditingHandoverInstance(instance);
         setHandoverTriggers(instance.human_handover_triggers || "");
         setAdminNotificationPhone(instance.notification_phone || "");
+        setRoundRobinActive(instance.round_robin_active !== false); // Default to true
         setShowHandoverModal(true);
         fetchAttendants(instance.id);
     };
@@ -284,12 +288,19 @@ const Canais = () => {
             const headers = await getAuthHeader();
             await axios.post(`${API}/instances/${editingHandoverInstance.id}/handover`, {
                 human_handover_triggers: handoverTriggers,
-                notification_phone: adminNotificationPhone
+                notification_phone: adminNotificationPhone,
+                round_robin_active: roundRobinActive
             }, { headers });
-            toast.success("Configurações de Handover salvas! 🤝");
-            fetchInstances(); // Update local instance data
+
+            setInstances(prev => prev.map(inst =>
+                inst.id === editingHandoverInstance.id
+                    ? { ...inst, human_handover_triggers: handoverTriggers, notification_phone: adminNotificationPhone, round_robin_active: roundRobinActive }
+                    : inst
+            ));
+
+            toast.success("Configuração de handover salva! ✅");
         } catch (err: any) {
-            toast.error("Erro ao salvar handover");
+            toast.error("Falha ao salvar configuração");
         } finally {
             setSavingHandover(false);
         }
@@ -678,12 +689,30 @@ const Canais = () => {
 
                             {/* Rodízio Section */}
                             <div className="space-y-5">
+                                <div className="flex items-center justify-between bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                                    <div className="space-y-0.5">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="w-4 h-4 text-blue-600" />
+                                            <Label className="text-sm font-bold text-gray-700">Rodízio Ativo</Label>
+                                        </div>
+                                        <p className="text-[10px] text-gray-500">Se desativado, apenas o Telefone Admin será notificado.</p>
+                                    </div>
+                                    <Switch
+                                        checked={roundRobinActive}
+                                        onCheckedChange={setRoundRobinActive}
+                                    />
+                                </div>
+
                                 <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                                        <Users className="w-4 h-4 text-blue-600" />
-                                        Gerenciar Rodízio de Atendentes
+                                    <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                        <ClipboardList className="w-4 h-4 text-blue-600" />
+                                        Gerenciar Atendentes
                                     </h4>
-                                    <Badge className="bg-blue-50 text-blue-600 border-blue-100 text-[10px] font-bold">Round-Robin Ativo</Badge>
+                                    {roundRobinActive && attendants.length > 0 && (
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] py-0 px-2 animate-pulse">
+                                            Na vez: {attendants.sort((a, b) => (a.last_handover_at || "").localeCompare(b.last_handover_at || ""))[0]?.name || "Ninguém"}
+                                        </Badge>
+                                    )}
                                 </div>
 
                                 {/* Form Adicionar */}

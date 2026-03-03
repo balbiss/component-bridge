@@ -594,11 +594,11 @@ app.delete('/api/attendants/:id', authenticateToken, async (req, res) => {
 app.post('/api/instances/:id/handover', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { human_handover_triggers, notification_phone } = req.body;
+        const { human_handover_triggers, notification_phone, round_robin_active } = req.body;
 
         const { data, error } = await supabaseAdmin
             .from('instances')
-            .update({ human_handover_triggers, notification_phone })
+            .update({ human_handover_triggers, notification_phone, round_robin_active })
             .eq('id', id)
             .eq('user_id', req.user.id)
             .select()
@@ -650,7 +650,25 @@ app.post('/api/instances/:id/handover/leads/:jid/reactivate', authenticateToken,
 // HUMAN HANDOVER HELPER
 // ──────────────────────────────────────────────────────────────
 async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHeaders) {
-    console.log(`[HANDOVER] Iniciando processo de transição para humano... Lead: ${pushName} (${remoteJid})`);
+    console.log(`[HANDOVER] Iniciando processo para ${pushName} (${remoteJid}). Round-Robin Ativo: ${instance.round_robin_active}`);
+
+    // Helper para normalizar JID de números brasileiros (remover 9 redundante se necessário)
+    const normalizeJid = (jid) => {
+        if (!jid) return jid;
+        let clean = jid.split('@')[0].replace(/[^0-9]/g, '');
+        // Se é Brasil (55) e tem 13 dígitos (com o 9 extra), tenta normalizar para 12
+        if (clean.startsWith('55') && clean.length === 13) {
+            const ddd = parseInt(clean.substring(2, 4));
+            if (ddd >= 11 && ddd <= 28) { // DDDs que geralmente usam o 9 no zap (SP/RJ/ES/MG)
+                return `${clean}@s.whatsapp.net`;
+            }
+            // Para outros (como 91), o WhatsApp costuma usar a versão sem o 9 (12 dígitos)
+            const withoutNine = clean.substring(0, 4) + clean.substring(5);
+            console.log(`[HANDOVER-NORM] Normalizando JID: ${clean} -> ${withoutNine}`);
+            return `${withoutNine}@s.whatsapp.net`;
+        }
+        return jid.includes('@') ? jid : `${clean}@s.whatsapp.net`;
+    };
     try {
         // 1. Disable AI for this contact
         await supabaseAdmin.from('ai_disabled_contacts').upsert({
@@ -670,39 +688,46 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
         });
         const summary = summaryCompletion.choices[0].message.content;
 
-        // 3. Find next attendant (Rodízio)
-        const { data: attendants, error: attError } = await supabaseAdmin
-            .from('attendants')
-            .select('*')
-            .eq('instance_id', instance.id)
-            .eq('is_active', true)
-            .order('last_handover_at', { ascending: true, nullsFirst: true });
-
         let targetPhone = instance.notification_phone;
         let attendantId = null;
 
-        if (attendants && attendants.length > 0) {
-            const nextAttendant = attendants[0];
-            targetPhone = nextAttendant.phone;
-            attendantId = nextAttendant.id;
-            console.log(`[HANDOVER] Rodízio: Selecionado atendente ${nextAttendant.name} (${targetPhone})`);
+        // 3. Find next attendant (Solo se Round-Robin estiver ativo)
+        if (instance.round_robin_active !== false) {
+            const { data: attendants, error: attError } = await supabaseAdmin
+                .from('attendants')
+                .select('*')
+                .eq('instance_id', instance.id)
+                .eq('is_active', true)
+                .order('last_handover_at', { ascending: true, nullsFirst: true });
+
+            if (attendants && attendants.length > 0) {
+                const nextAttendant = attendants[0];
+                targetPhone = nextAttendant.phone;
+                attendantId = nextAttendant.id;
+                console.log(`[HANDOVER] Rodízio: Selecionado atendente ${nextAttendant.name} (${targetPhone})`);
+            } else {
+                console.log(`[HANDOVER] Rodízio ativo, mas nenhum atendente encontrado. Usando backup: ${targetPhone}`);
+            }
         } else {
-            console.log(`[HANDOVER] Nenhum atendente ativo. Usando telefone admin: ${targetPhone}`);
+            console.log(`[HANDOVER] Rodízio inativo. Usando telefone admin fixo: ${targetPhone}`);
         }
 
         if (targetPhone) {
+            const normalizedTarget = normalizeJid(targetPhone);
+            const normalizedLead = normalizeJid(remoteJid);
+            console.log(`[HANDOVER] Alvos Normalizados - Atendente: ${normalizedTarget}, Lead: ${normalizedLead}`);
             // 4. Send notification via Wuzapi to the ATTENDANT or ADMIN
             const notificationText = `*🚨 [NOTIFICAÇÃO DE HANDOVER] 🚨*\n\n*Lead:* ${pushName} (${remoteJid})\n\n*Resumo da Conversa:*\n${summary}\n\n_A IA foi pausada para este contato._`;
 
             await wuzCall('POST', '/chat/send/text', {
-                Phone: targetPhone,
+                Phone: normalizedTarget,
                 Body: notificationText
             }, wuzapiHeaders);
 
             // --- 4.5 NOTIFY THE LEAD ---
             const leadTransferMessage = `Entendi, ${pushName}. Estou transferindo sua conversa para um de nossos atendentes agora mesmo. Por favor, aguarde um momento! 🤝`;
             await wuzCall('POST', '/chat/send/text', {
-                Phone: remoteJid,
+                Phone: normalizedLead,
                 Body: leadTransferMessage
             }, wuzapiHeaders);
 
