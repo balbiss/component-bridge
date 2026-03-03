@@ -1,5 +1,8 @@
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+// Trava local para evitar que o mesmo processo processe a mesma campanha em paralelo
+const activeCampaigns = new Set();
+
 function applyTemplate(text, name) {
     return text.replace(/\{\{nome\}\}/gi, name || 'Amigo(a)');
 }
@@ -8,52 +11,76 @@ async function processCampaigns(supabase, helpers) {
     const { wuzCall, checkPhoneOnWhatsApp } = helpers;
 
     try {
-        // 1. Busca campanhas agendadas ou em execução (para retomada)
-        const now = new Date().toISOString();
+        const now = new Date();
+        const staleThreshold = new Date(now.getTime() - 5 * 60 * 1000).toISOString(); // 5 minutos atrás
+
+        // 1. Busca campanhas que precisam de atenção:
+        // - 'scheduled' com data de agendamento passada
+        // - 'running' que não foram atualizadas há mais de 5 minutos (indicativo de queda do servidor)
         const { data: campaigns, error } = await supabase
             .from('campaigns')
             .select('*, instance:instances(*)')
-            .or(`status.eq.scheduled,status.eq.running`)
-            .lte('scheduled_at', now);
+            .or(`status.eq.scheduled,and(status.eq.running,updated_at.lt.${staleThreshold})`)
+            .lte('scheduled_at', now.toISOString());
 
         if (error) throw error;
         if (!campaigns || campaigns.length === 0) return;
 
-        console.log(`[WORKER] Encontradas ${campaigns.length} campanhas para processar.`);
+        // Filtra as que já estão sendo processadas por este worker específico
+        const toProcess = campaigns.filter(c => !activeCampaigns.has(c.id));
+        if (toProcess.length === 0) return;
 
-        for (const campaign of campaigns) {
+        console.log(`[WORKER] Encontradas ${toProcess.length} campanhas elegíveis.`);
+
+        for (const campaign of toProcess) {
+            // Adiciona à trava local
+            activeCampaigns.add(campaign.id);
+
             try {
-                // Se já estiver 'running', pode ser uma retomada após queda do servidor
-                if (campaign.status === 'running') {
-                    console.log(`[WORKER] Retomando campanha interrompida: ${campaign.name} (${campaign.id}) — do índice ${campaign.current_index || 0}`);
-                } else {
-                    // Marca como rodando para evitar que outros processos peguem
-                    const { error: upErr } = await supabase.from('campaigns').update({ status: 'running', updated_at: new Date().toISOString() }).eq('id', campaign.id);
-                    if (upErr) throw upErr;
-                    console.log(`[WORKER] Iniciando campanha: ${campaign.name} (${campaign.id})`);
-                }
+                // Marca como rodando e atualiza o timestamp para mostrar sinal de vida
+                const { error: upErr } = await supabase
+                    .from('campaigns')
+                    .update({
+                        status: 'running',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', campaign.id);
+
+                if (upErr) throw upErr;
+
+                console.log(`[WORKER] Iniciando/Retomando campanha: ${campaign.name} (${campaign.id})`);
 
                 const instance = campaign.instance;
-                if (!instance || !instance.wuzapi_token) {
-                    throw new Error('Instância não encontrada ou sem token Wuzapi');
-                }
+                if (!instance || !instance.wuzapi_token) throw new Error('Instância inválida');
 
                 const contacts = campaign.contacts || [];
                 const messages = campaign.messages || [];
                 const mediaType = campaign.media_type || 'text';
                 const token = instance.wuzapi_token;
 
-                const results = [];
-                let successCount = 0;
-                let errorCount = 0;
+                // Resume de onde parou
+                const startIndex = campaign.current_index || 0;
+                let results = Array.isArray(campaign.results) ? campaign.results : [];
 
-                // Inicializa total_contacts se não estiver setado
-                if (!campaign.total_contacts) {
-                    await supabase.from('campaigns').update({ total_contacts: contacts.length }).eq('id', campaign.id);
+                // Se o current_index exceder o número de contatos, finaliza logo
+                if (startIndex >= contacts.length) {
+                    await supabase.from('campaigns').update({ status: 'completed' }).eq('id', campaign.id);
+                    continue;
                 }
 
-                const startIndex = campaign.current_index || 0;
                 for (let i = startIndex; i < contacts.length; i++) {
+                    // Check POINT: Antes de cada envio, verifica se houve intervenção externa (Pause/Cancel)
+                    const { data: check, error: checkErr } = await supabase
+                        .from('campaigns')
+                        .select('status')
+                        .eq('id', campaign.id)
+                        .single();
+
+                    if (checkErr || !check || check.status !== 'running') {
+                        console.log(`[WORKER] Campanha ${campaign.id} interrompida. Status atual: ${check?.status || 'desconhecido'}`);
+                        break;
+                    }
+
                     const contact = contacts[i];
                     const msgTemplate = messages[i % messages.length] || '';
                     const body = applyTemplate(msgTemplate, contact.name);
@@ -63,17 +90,10 @@ async function processCampaigns(supabase, helpers) {
                     let errorMsg = '';
 
                     try {
-                        // ── Validação/JID Canônico (9º dígito) ──────────
-                        const check = await checkPhoneOnWhatsApp(token, targetPhone);
-                        if (check.jid) {
-                            const canonical = check.jid.split('@')[0];
-                            if (canonical !== targetPhone) {
-                                console.log(`[WORKER] Canonicalizing: ${targetPhone} -> ${canonical}`);
-                                targetPhone = canonical;
-                            }
-                        }
+                        // Canonicalização do número
+                        const checkWuz = await checkPhoneOnWhatsApp(token, targetPhone);
+                        if (checkWuz.jid) targetPhone = checkWuz.jid.split('@')[0];
 
-                        // ── Envio ───────────────────────────────────────
                         let payload = { Phone: targetPhone };
                         let endpoint = '';
 
@@ -98,64 +118,51 @@ async function processCampaigns(supabase, helpers) {
                             payload.Caption = campaign.file_caption || body;
                         }
 
-                        // ── DEBUG LOGS ──────────────────────────────────
-                        console.log(`[WORKER] Calling Wuzapi: ${endpoint} | Target: ${targetPhone}`);
-                        console.log(`[WORKER] Payload: ${JSON.stringify(payload).substring(0, 300)}...`);
-
+                        console.log(`[WORKER] Sending to ${targetPhone} | Camp: ${campaign.id}`);
                         const r = await wuzCall('POST', endpoint, payload, { token });
 
-                        if (r.data?.success === false) {
-                            throw new Error(r.data?.message || 'Wuzapi error');
-                        }
-
-                        successCount++;
+                        if (r.data?.success === false) throw new Error(r.data?.message || 'Wuzapi error');
                         status = 'success';
                     } catch (err) {
-                        const errorDetails = err.response?.data || err.message;
-                        console.error(`[WORKER] Erro ao enviar para ${targetPhone}:`, JSON.stringify(errorDetails));
-                        errorCount++;
                         errorMsg = err.response?.data?.message || err.message;
+                        console.error(`[WORKER] Erro em ${targetPhone}:`, errorMsg);
                         status = 'error';
                     }
 
                     results.push({ phone: targetPhone, status, error: errorMsg, ts: new Date().toISOString() });
 
-                    // Atualiza progresso periodicamente (ou a cada mensagem se for pequena)
-                    // Para dar feedback em tempo real no Dashboard, atualizamos a cada mensagem.
-                    // Adicionamos uma verificação: se o status no BD não for mais 'running', paramos (cancelamento)
-                    const { data: currentCamp } = await supabase.from('campaigns').select('status').eq('id', campaign.id).single();
-                    if (currentCamp && currentCamp.status !== 'running') {
-                        console.log(`[WORKER] Campanha ${campaign.id} interrompida externamente (status: ${currentCamp.status})`);
-                        return; // Sai do loop da campanha
-                    }
-
+                    // Persiste progresso a cada envio para garantir retomada precisa
                     await supabase.from('campaigns').update({
                         current_index: i + 1,
-                        results: results,
+                        results,
                         updated_at: new Date().toISOString()
                     }).eq('id', campaign.id);
 
-                    // Delay entre envios
+                    // Delay humanoide
                     const delay = (campaign.interval_base + Math.random() * campaign.randomization) * 1000;
                     await sleep(delay);
                 }
 
-                // Finaliza campanha
-                await supabase.from('campaigns').update({
-                    status: 'completed',
-                    updated_at: new Date().toISOString(),
-                    current_index: contacts.length // Garante que está no final
-                }).eq('id', campaign.id);
-
-                console.log(`[WORKER] Campanha ${campaign.name} concluída. Sucesso: ${successCount}, Erro: ${errorCount}`);
+                // Verifica se terminou todos os contatos com sucesso ou se saiu por interrupção
+                const { data: finalCheck } = await supabase.from('campaigns').select('status, current_index').eq('id', campaign.id).single();
+                if (finalCheck && finalCheck.status === 'running' && finalCheck.current_index >= contacts.length) {
+                    await supabase.from('campaigns').update({
+                        status: 'completed',
+                        updated_at: new Date().toISOString()
+                    }).eq('id', campaign.id);
+                    console.log(`[WORKER] Campanha ${campaign.name} finalizada com sucesso.`);
+                }
 
             } catch (campErr) {
-                console.error(`[WORKER] Falha crítica na campanha ${campaign.id}:`, campErr.message);
-                await supabase.from('campaigns').update({ status: 'error' }).eq('id', campaign.id);
+                console.error(`[WORKER] Erro grave na campanha ${campaign.id}:`, campErr.message);
+                await supabase.from('campaigns').update({ status: 'error', error_log: campErr.message }).eq('id', campaign.id);
+            } finally {
+                // Libera a trava local
+                activeCampaigns.delete(campaign.id);
             }
         }
     } catch (err) {
-        console.error('[WORKER] Erro no processamento:', err.message);
+        console.error('[WORKER] Loop principal falhou:', err.message);
     }
 }
 

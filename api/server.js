@@ -1186,18 +1186,49 @@ app.post('/api/campaigns', authenticateToken, async (req, res) => {
     }
 });
 
+// POST /api/campaigns/:id/pause
+app.post('/api/campaigns/:id/pause', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('campaigns')
+            .update({ status: 'paused', updated_at: new Date().toISOString() })
+            .eq('id', req.params.id)
+            .eq('user_id', req.user.id);
+
+        if (error) throw error;
+        res.json({ success: true, message: 'Campanha pausada' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/campaigns/:id/resume
+app.post('/api/campaigns/:id/resume', authenticateToken, async (req, res) => {
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('campaigns')
+            .update({ status: 'scheduled', updated_at: new Date().toISOString() })
+            .eq('id', req.params.id)
+            .eq('user_id', req.user.id);
+
+        if (error) throw error;
+        res.json({ success: true, message: 'Campanha retomada (agendada)' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // POST /api/campaigns/:id/cancel
 app.post('/api/campaigns/:id/cancel', authenticateToken, async (req, res) => {
     try {
         const { data, error } = await supabaseAdmin
             .from('campaigns')
-            .update({ status: 'completed', updated_at: new Date().toISOString() })
+            .update({ status: 'canceled', updated_at: new Date().toISOString() })
             .eq('id', req.params.id)
-            .eq('user_id', req.user.id)
-            .select();
+            .eq('user_id', req.user.id);
 
         if (error) throw error;
-        res.json({ success: true, message: 'Campanha cancelada com sucesso' });
+        res.json({ success: true, message: 'Campanha cancelada' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
