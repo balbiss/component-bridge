@@ -729,7 +729,7 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
             }
         }
         if (selectedPhone) {
-            const check = await checkPhoneOnWhatsApp(instance.token, selectedPhone);
+            const check = await checkPhoneOnWhatsApp(instance.wuzapi_token, selectedPhone);
             const normalizedTarget = check.valid && check.jid ? check.jid : normalizeJid(selectedPhone);
             const normalizedLead = normalizeJid(remoteJid);
 
@@ -744,7 +744,7 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
             let finalJid = normalizedTarget;
             if (!check.valid && instance.notification_phone && selectedPhone !== instance.notification_phone) {
                 console.warn(`[HANDOVER-VAL] Atendente inválido. Tentando fallback para Admin...`);
-                const adminCheck = await checkPhoneOnWhatsApp(instance.token, instance.notification_phone);
+                const adminCheck = await checkPhoneOnWhatsApp(instance.wuzapi_token, instance.notification_phone);
                 if (adminCheck.valid && adminCheck.jid) {
                     finalJid = adminCheck.jid;
                 } else {
