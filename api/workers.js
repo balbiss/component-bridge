@@ -100,7 +100,7 @@ async function processCampaigns(supabase, helpers) {
 
                         // ── DEBUG LOGS ──────────────────────────────────
                         console.log(`[WORKER] Calling Wuzapi: ${endpoint} | Target: ${targetPhone}`);
-                        console.log(`[WORKER] Payload: ${JSON.stringify(payload)}`);
+                        console.log(`[WORKER] Payload: ${JSON.stringify(payload).substring(0, 300)}...`);
 
                         const r = await wuzCall('POST', endpoint, payload, { token });
 

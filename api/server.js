@@ -57,9 +57,28 @@ const wuzapi = axios.create({
 const wuzapiAdmin = (extraHeaders = {}) =>
     wuzapi.request.bind({ ...wuzapi.defaults, headers: { ...wuzapi.defaults.headers, Authorization: process.env.WUZAPI_ADMIN_TOKEN, ...extraHeaders } });
 
+// Helper: normalize base64 prefix for Wuzapi
+const normalizeBase64 = (str, forceMime) => {
+    if (typeof str !== 'string') return str;
+    if (!str.startsWith('data:')) return str;
+    if (forceMime) {
+        return str.replace(/^data:[^;]+;base64,/, `data:${forceMime};base64,`);
+    }
+    return str;
+};
+
 // Helper: call wuzapi with automatic header injection
-const wuzCall = (method, path, data, headers = {}) =>
-    wuzapi({ method, url: path, data, headers });
+const wuzCall = (method, path, data, headers = {}) => {
+    // Auto-normalize media payloads based on Wuzapi Spec
+    if (data) {
+        // Documents MUST be application/octet-stream
+        if (data.Document) data.Document = normalizeBase64(data.Document, 'application/octet-stream');
+
+        // Image/Audio/Video usually come with correct mimes from the browser/frontend.
+        // We no longer force octet-stream on them to avoid Wuzapi rejecting specific mimes.
+    }
+    return wuzapi({ method, url: path, data, headers });
+};
 
 // ──────────────────────────────────────────────────────────────
 // IN-MEMORY CACHE — avoids hammering Wuzapi on every request
@@ -166,7 +185,7 @@ app.use(rateLimit({
     max: 120,
     standardHeaders: true,
     legacyHeaders: false,
-    validate: { trustProxy: false },
+    validate: false,
     message: { error: 'Muitas requisições. Tente novamente em 1 minuto.' },
 }));
 
