@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export const API = 'http://localhost:3002/api';
+export const API = import.meta.env.VITE_API_URL || 'http://localhost:3003/api';
 
 export async function getAuthHeader() {
     const { data: { session } } = await supabase.auth.getSession();

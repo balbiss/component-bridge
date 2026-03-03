@@ -17,21 +17,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
+    const fetchedUserId = useRef<string | null>(null);
 
     useEffect(() => {
         let mounted = true;
 
         // Listen for changes on auth state (this also triggers on initial load)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth state change:', event, session?.user?.email);
+            // console.log('Auth state change:', event);
 
             if (mounted) {
                 setSession(session);
                 setUser(session?.user ?? null);
 
                 if (session?.user) {
-                    await fetchProfile(session.user.id);
+                    if (fetchedUserId.current !== session.user.id) {
+                        await fetchProfile(session.user.id);
+                    }
                 } else {
+                    fetchedUserId.current = null;
                     setProfile(null);
                     setLoading(false);
                 }
@@ -43,7 +47,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (mounted && !user && session?.user) {
                 setSession(session);
                 setUser(session.user);
-                fetchProfile(session.user.id);
+                if (fetchedUserId.current !== session.user.id) {
+                    fetchProfile(session.user.id);
+                }
             } else if (mounted && !session?.user) {
                 setLoading(false);
             }
@@ -56,12 +62,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const fetchProfile = async (userId: string) => {
-        console.log('Fetching profile for user:', userId);
+        // console.log('Fetching profile for user:', userId);
+        fetchedUserId.current = userId; // Mark as fetching/fetched
+        let timeoutId: NodeJS.Timeout;
         try {
             // Set a longer timeout for profile (15s) to avoid race conditions on slow connections
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Profile fetch timeout (15s)')), 15000)
-            );
+            const timeoutPromise = new Promise((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error('Profile fetch timeout (15s)')), 15000);
+            });
 
             const fetchPromise = supabase
                 .from('profiles')
@@ -70,9 +78,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 .single();
 
             const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+            clearTimeout(timeoutId!);
 
             if (data) {
-                console.log('Profile fetched successfully');
+                // console.log('Profile fetched successfully');
                 setProfile(data);
             } else {
                 console.log('Profile non-existent or fetch error');

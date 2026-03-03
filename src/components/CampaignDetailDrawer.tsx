@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Download, CheckCircle2, XCircle, Clock, Loader2, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
+import { API } from '@/lib/api';
 import * as XLSX from 'xlsx';
 
 interface LogEntry {
@@ -46,7 +47,7 @@ export function CampaignDetailDrawer({ campaign, onClose }: Props) {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) { setLoading(false); return; }
 
-            const res = await fetch(`http://localhost:3002/api/campaigns/${campaign.id}/logs`, {
+            const res = await fetch(`${API}/campaigns/${campaign.id}/logs`, {
                 headers: { Authorization: `Bearer ${session.access_token}` },
             });
             if (res.ok) {
