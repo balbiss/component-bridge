@@ -536,6 +536,116 @@ app.delete('/api/instances/:id/memory', authenticateToken, async (req, res) => {
     }
 });
 
+// --- HUMAN HANDOVER & ATTENDANTS ROUTES ---
+
+// GET /api/instances/:id/attendants - list attendants
+app.get('/api/instances/:id/attendants', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { data, error } = await supabaseAdmin
+            .from('attendants')
+            .select('*')
+            .eq('instance_id', id)
+            .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/instances/:id/attendants - add attendant
+app.post('/api/instances/:id/attendants', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, phone } = req.body;
+
+        const { data, error } = await supabaseAdmin
+            .from('attendants')
+            .insert({ instance_id: id, name, phone })
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /api/attendants/:id - remove attendant
+app.delete('/api/attendants/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { error } = await supabaseAdmin
+            .from('attendants')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/instances/:id/handover - update handover settings
+app.post('/api/instances/:id/handover', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { human_handover_triggers, notification_phone } = req.body;
+
+        const { data, error } = await supabaseAdmin
+            .from('instances')
+            .update({ human_handover_triggers, notification_phone })
+            .eq('id', id)
+            .eq('user_id', req.user.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/instances/:id/handover/leads - list paused leads
+app.get('/api/instances/:id/handover/leads', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { data, error } = await supabaseAdmin
+            .from('ai_disabled_contacts')
+            .select('*')
+            .eq('instance_id', id)
+            .eq('active', true)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/instances/:id/handover/leads/:jid/reactivate - reactivate AI
+app.post('/api/instances/:id/handover/leads/:jid/reactivate', authenticateToken, async (req, res) => {
+    try {
+        const { id, jid } = req.params;
+        const { error } = await supabaseAdmin
+            .from('ai_disabled_contacts')
+            .update({ active: false })
+            .eq('instance_id', id)
+            .eq('remote_jid', jid);
+
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // GLOBAL WEBHOOK - Process Wuzapi Messages
 app.post('/api/webhook', async (req, res) => {
     console.log('--- WUZAPI WEBHOOK RECEIVED ---');
@@ -565,12 +675,14 @@ app.post('/api/webhook', async (req, res) => {
         const isBroadcast = chat.includes('@broadcast') || chat.includes('@newsletter');
         const fromMe = info.IsFromMe;
         const pushName = info.PushName || 'Lead';
+        const rawJid = info.SenderAlt || info.Sender || info.Chat || '';
+        const remoteJid = rawJid.replace(/@.*$/, ''); // Extract clean phone number
 
-        console.log(`[WEBHOOK] Filtros Iniciais - Chat: ${chat}, isGroup: ${isGroup}, isBroadcast: ${isBroadcast}, fromMe: ${fromMe}`);
+        console.log(`[WEBHOOK] Filtros Iniciais - Chat: ${chat}, isGroup: ${isGroup}, isBroadcast: ${isBroadcast}, fromMe: ${fromMe}, RemoteJID: ${remoteJid}`);
 
-        // 3. Filters: No groups, no broadcast, no self-messages
-        if (isGroup || isBroadcast || fromMe) {
-            console.log(`[WEBHOOK] Mensagem filtrada/bloqueada (Group/Bcast/Me). Saindo.`);
+        // 3. Filters: No groups, no broadcast.
+        if (isGroup || isBroadcast) {
+            console.log(`[WEBHOOK] Mensagem filtrada (Group/Bcast). Saindo.`);
             return;
         }
 
@@ -609,10 +721,36 @@ app.post('/api/webhook', async (req, res) => {
             return;
         }
 
-        const rawJid = info.SenderAlt || info.Sender || info.Chat || '';
-        const remoteJid = rawJid.replace(/@.*$/, ''); // Extract clean phone number
+        // --- AUTO-PAUSE HUMAN INTERVENTION ---
+        if (fromMe) {
+            console.log(`[AUTO-PAUSE] Intervenção humana detectada na instância ${instance.id} para o contato ${remoteJid}.`);
+            try {
+                await supabaseAdmin.from('ai_disabled_contacts').upsert({
+                    instance_id: instance.id,
+                    remote_jid: remoteJid
+                });
+                console.log(`[AUTO-PAUSE] IA desativada com sucesso para ${remoteJid}.`);
+            } catch (apErr) {
+                console.error(`[AUTO-PAUSE] Erro ao desativar IA:`, apErr.message);
+            }
+            return; // Exit, we don't want AI to respond to human's own message
+        }
 
         console.log(`[WEBHOOK] Instância ativada encontrada! ID: ${instance.id}. RemoteJID limpo: ${remoteJid}`);
+
+        // --- 4.5 Check if AI is disabled for this contact ---
+        const { data: disabledContact, error: disabledError } = await supabaseAdmin
+            .from('ai_disabled_contacts')
+            .select('active')
+            .eq('instance_id', instance.id)
+            .eq('remote_jid', remoteJid)
+            .eq('active', true)
+            .maybeSingle();
+
+        if (disabledContact) {
+            console.log(`[WEBHOOK] AI desativada para este contato (${remoteJid}). Abortando processamento da IA.`);
+            return;
+        }
 
         const wuzapiBase = process.env.WUZAPI_URL;
         const wuzapiHeaders = { token: token };
@@ -771,6 +909,88 @@ app.post('/api/webhook', async (req, res) => {
             ...chatContext,
             { role: 'user', content: userMessageContent }
         ];
+
+        // --- 8.5.5 CHECK FOR HANDOVER TRIGGERS ---
+        const triggers = (instance.human_handover_triggers || '').split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
+        const userMsgLower = userMessageContent.toLowerCase();
+        const hasTrigger = triggers.some(t => userMsgLower.includes(t));
+
+        if (hasTrigger) {
+            console.log(`[HANDOVER] Gatilho detectado: "${userMessageContent}". Iniciando transição para humano...`);
+
+            try {
+                // 1. Disable AI for this contact
+                await supabaseAdmin.from('ai_disabled_contacts').insert({
+                    instance_id: instance.id,
+                    remote_jid: remoteJid,
+                    active: true
+                });
+
+                // 2. Generate summary
+                console.log(`[HANDOVER] Gerando resumo da conversa para o atendente...`);
+                const summaryCompletion = await openai.chat.completions.create({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        { role: 'system', content: 'Você é um assistente que resume conversas de WhatsApp para atendentes humanos. Gere um resumo curto e objetivo do que o lead deseja.' },
+                        ...messages
+                    ]
+                });
+                const summary = summaryCompletion.choices[0].message.content;
+
+                // 3. Find next attendant (Rodízio)
+                const { data: attendants, error: attError } = await supabaseAdmin
+                    .from('attendants')
+                    .select('*')
+                    .eq('instance_id', instance.id)
+                    .eq('is_active', true)
+                    .order('last_handover_at', { ascending: true, nullsFirst: true });
+
+                let targetPhone = instance.notification_phone;
+                let attendantId = null;
+
+                if (attendants && attendants.length > 0) {
+                    const nextAttendant = attendants[0];
+                    targetPhone = nextAttendant.phone;
+                    attendantId = nextAttendant.id;
+                    console.log(`[HANDOVER] Rodízio: Selecionado atendente ${nextAttendant.name} (${targetPhone})`);
+                } else {
+                    console.log(`[HANDOVER] Nenhum atendente ativo. Usando telefone admin: ${targetPhone}`);
+                }
+
+                if (targetPhone) {
+                    // 4. Send notification via Wuzapi to the ATTENDANT or ADMIN
+                    const notificationText = `*🚨 [NOTIFICAÇÃO DE HANDOVER] 🚨*\n\n*Lead:* ${pushName} (${remoteJid})\n\n*Resumo da Conversa:*\n${summary}\n\n_A IA foi pausada para este contato._`;
+
+                    await axios.post(`${wuzapiBase}/chat/sendtext`, {
+                        Phone: targetPhone,
+                        Body: notificationText
+                    }, { headers: wuzapiHeaders });
+
+                    // --- 4.5 NOTIFY THE LEAD ---
+                    // Send a courtesy message to the customer letting them know they are being transferred
+                    const leadTransferMessage = `Entendi, ${pushName}. Estou transferindo sua conversa para um de nossos atendentes agora mesmo. Por favor, aguarde um momento! 🤝`;
+                    await axios.post(`${wuzapiBase}/chat/sendtext`, {
+                        Phone: remoteJid,
+                        Body: leadTransferMessage
+                    }, { headers: wuzapiHeaders });
+
+                    // 5. Update last_handover_at if we used an attendant
+                    if (attendantId) {
+                        await supabaseAdmin.from('attendants').update({ last_handover_at: new Date().toISOString() }).eq('id', attendantId);
+                    }
+
+                    console.log(`[HANDOVER] Notificações enviadas para atendente (${targetPhone}) e lead (${remoteJid}).`);
+                } else {
+                    console.warn(`[HANDOVER] Falha: Nenhum número de destino (atendente ou admin) configurado.`);
+                }
+
+            } catch (hErr) {
+                console.error(`[HANDOVER] Erro fatal no processo de handover:`, hErr.message);
+            }
+
+            // Exit early - don't let the AI respond to the trigger message
+            return;
+        }
 
         // --- 8.6 SAVE USER MESSAGE TO MEMORY DB ---
         try {

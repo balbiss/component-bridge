@@ -42,6 +42,23 @@ const Canais = () => {
     const [tempDelayMax, setTempDelayMax] = useState(5000);
     const [savingAI, setSavingAI] = useState(false);
 
+    // --- HUMAN HANDOVER & RODIZIO STATES ---
+    const [showHandoverModal, setShowHandoverModal] = useState(false);
+    const [editingHandoverInstance, setEditingHandoverInstance] = useState<any | null>(null);
+    const [handoverTriggers, setHandoverTriggers] = useState("");
+    const [adminNotificationPhone, setAdminNotificationPhone] = useState("");
+    const [attendants, setAttendants] = useState<any[]>([]);
+    const [newAttName, setNewAttName] = useState("");
+    const [newAttPhone, setNewAttPhone] = useState("");
+    const [loadingHandover, setLoadingHandover] = useState(false);
+    const [savingHandover, setSavingHandover] = useState(false);
+
+    // --- Leads em Atendimento ---
+    const [showLeadsModal, setShowLeadsModal] = useState(false);
+    const [handoverLeads, setHandoverLeads] = useState<any[]>([]);
+    const [loadingLeads, setLoadingLeads] = useState(false);
+    const [editingLeadsInstance, setEditingLeadsInstance] = useState<any | null>(null);
+
     // ── Buscar instâncias ──────────────────────────────────────
     const fetchInstances = useCallback(async () => {
         try {
@@ -238,6 +255,74 @@ const Canais = () => {
         setShowPromptModal(true);
     };
 
+    // --- HUMAN HANDOVER & RODIZIO FUNCTIONS ---
+    const openHandoverModal = async (instance: any) => {
+        setEditingHandoverInstance(instance);
+        setHandoverTriggers(instance.human_handover_triggers || "");
+        setAdminNotificationPhone(instance.notification_phone || "");
+        setShowHandoverModal(true);
+        fetchAttendants(instance.id);
+    };
+
+    const fetchAttendants = async (instanceId: string) => {
+        setLoadingHandover(true);
+        try {
+            const headers = await getAuthHeader();
+            const { data } = await axios.get(`${API}/instances/${instanceId}/attendants`, { headers });
+            setAttendants(data);
+        } catch (err: any) {
+            console.error("Erro ao buscar atendentes:", err.message);
+        } finally {
+            setLoadingHandover(false);
+        }
+    };
+
+    const saveHandoverConfig = async () => {
+        if (!editingHandoverInstance) return;
+        setSavingHandover(true);
+        try {
+            const headers = await getAuthHeader();
+            await axios.post(`${API}/instances/${editingHandoverInstance.id}/handover`, {
+                human_handover_triggers: handoverTriggers,
+                notification_phone: adminNotificationPhone
+            }, { headers });
+            toast.success("Configurações de Handover salvas! 🤝");
+            fetchInstances(); // Update local instance data
+        } catch (err: any) {
+            toast.error("Erro ao salvar handover");
+        } finally {
+            setSavingHandover(false);
+        }
+    };
+
+    const addAttendant = async () => {
+        if (!newAttName.trim() || !newAttPhone.trim()) return toast.error("Preencha nome e telefone");
+        try {
+            const headers = await getAuthHeader();
+            await axios.post(`${API}/instances/${editingHandoverInstance.id}/attendants`, {
+                name: newAttName.trim(),
+                phone: newAttPhone.trim().replace(/[^0-9]/g, "")
+            }, { headers });
+            setNewAttName("");
+            setNewAttPhone("");
+            fetchAttendants(editingHandoverInstance.id);
+            toast.success("Atendente adicionado! ✅");
+        } catch (err: any) {
+            toast.error("Erro ao adicionar atendente");
+        }
+    };
+
+    const deleteAttendant = async (id: string) => {
+        try {
+            const headers = await getAuthHeader();
+            await axios.delete(`${API}/attendants/${id}`, { headers });
+            fetchAttendants(editingHandoverInstance.id);
+            toast.success("Atendente removido.");
+        } catch (err: any) {
+            toast.error("Erro ao remover");
+        }
+    };
+
     // ── Loading screen ─────────────────────────────────────────
     if (loading) {
         return (
@@ -300,6 +385,8 @@ const Canais = () => {
                         onToggleAI={toggleAIAgent}
                         onEditAI={openAIModal}
                         onResetMemory={resetAIMemory}
+                        onOpenHandover={openHandoverModal}
+                        onOpenLeads={openLeadsModal}
                     />
                 ))}
             </div>
@@ -498,6 +585,216 @@ const Canais = () => {
                     </div>
                 </div>
             )}
+            {/* Modal: Handover & Rodízio */}
+            {showHandoverModal && editingHandoverInstance && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-purple-100 flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="p-6 bg-gradient-to-r from-green-600 to-teal-600 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
+                                    <Users className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold">Temas para Humano & Rodízio</h3>
+                                    <p className="text-green-100 text-xs mt-0.5">Configure quando a IA deve parar e quem deve atender: {editingHandoverInstance.name}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowHandoverModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                <XCircle className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto space-y-8">
+                            {/* Gatilhos e Admin Section */}
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                                        <Target className="w-4 h-4 text-green-600" />
+                                        Gatilhos de Handover (Palavras-chave)
+                                    </label>
+                                    <textarea
+                                        value={handoverTriggers}
+                                        onChange={(e) => setHandoverTriggers(e.target.value)}
+                                        placeholder="Ex: falar com humano, preço, atendente, ajuda (separados por vírgula)"
+                                        className="w-full h-24 p-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm"
+                                    />
+                                    <p className="text-[10px] text-gray-400">Quando o lead disser qualquer uma dessas palavras, a IA será pausada e o rodízio disparado.</p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700">Telefone Admin (Backup)</label>
+                                    <Input
+                                        placeholder="Ex: 5511999999999"
+                                        value={adminNotificationPhone}
+                                        onChange={(e) => setAdminNotificationPhone(e.target.value)}
+                                        className="h-10 rounded-xl"
+                                    />
+                                    <p className="text-[10px] text-gray-400">Usado se não houver atendentes no rodízio.</p>
+                                </div>
+
+                                <Button
+                                    onClick={saveHandoverConfig}
+                                    className="w-full bg-green-600 hover:bg-green-700 text-white h-10 rounded-xl font-bold shadow-md shadow-green-100"
+                                    disabled={savingHandover}
+                                >
+                                    {savingHandover ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                                    Salvar Gatilhos & Admin
+                                </Button>
+                            </div>
+
+                            <hr className="border-gray-100" />
+
+                            {/* Rodízio Section */}
+                            <div className="space-y-5">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                                        <Users className="w-4 h-4 text-blue-600" />
+                                        Gerenciar Rodízio de Atendentes
+                                    </h4>
+                                    <Badge className="bg-blue-50 text-blue-600 border-blue-100 text-[10px] font-bold">Round-Robin Ativo</Badge>
+                                </div>
+
+                                {/* Form Adicionar */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Nome do Atendente</label>
+                                        <Input
+                                            placeholder="Ex: João"
+                                            value={newAttName}
+                                            onChange={(e) => setNewAttName(e.target.value)}
+                                            className="bg-white h-9 rounded-lg"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">WhatsApp (DDI+DDD)</label>
+                                        <Input
+                                            placeholder="Ex: 5511..."
+                                            value={newAttPhone}
+                                            onChange={(e) => setNewAttPhone(e.target.value)}
+                                            className="bg-white h-9 rounded-lg"
+                                        />
+                                    </div>
+                                    <Button
+                                        onClick={addAttendant}
+                                        className="md:col-span-2 bg-blue-600 hover:bg-blue-700 h-9 font-bold text-xs rounded-lg"
+                                    >
+                                        <Plus className="w-3.5 h-3.5 mr-1.5" /> Adicionar à Fila
+                                    </Button>
+                                </div>
+
+                                {/* Lista Atendentes */}
+                                <div className="space-y-2">
+                                    {loadingHandover ? (
+                                        <div className="flex justify-center p-4">
+                                            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                                        </div>
+                                    ) : attendants.length === 0 ? (
+                                        <p className="text-center text-xs text-gray-400 py-4 italic">Nenhum atendente cadastrado no rodízio.</p>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto pr-1">
+                                            {attendants.map((att) => (
+                                                <div key={att.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl hover:border-blue-200 transition-colors shadow-sm">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                                                            {att.name.charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-bold text-gray-800">{att.name}</p>
+                                                            <p className="text-[10px] text-gray-500">+{att.phone}</p>
+                                                        </div>
+                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-gray-300 hover:text-red-500 transition-colors"
+                                                        onClick={() => deleteAttendant(att.id)}
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-center">
+                            <p className="text-[10px] text-gray-400">As notificações de handover incluem Lead, Número e Resumo da Conversa.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Modal: Leads em Atendimento */}
+            {showLeadsModal && editingLeadsInstance && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-orange-100 flex flex-col max-h-[80vh]">
+                        {/* Header */}
+                        <div className="p-6 bg-gradient-to-r from-orange-500 to-red-600 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
+                                    <Target className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold">Leads em Atendimento</h3>
+                                    <p className="text-orange-100 text-xs mt-0.5">IA pausada para estes contatos ({editingLeadsInstance.name})</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowLeadsModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                <XCircle className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto min-h-[300px]">
+                            {loadingLeads ? (
+                                <div className="flex flex-col items-center justify-center h-48 space-y-3">
+                                    <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                                    <p className="text-gray-400 text-sm">Buscando leads pausados...</p>
+                                </div>
+                            ) : handoverLeads.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-48 space-y-3 text-center">
+                                    <Activity className="w-12 h-12 text-gray-200" />
+                                    <p className="text-gray-400 text-sm italic">Nenhum lead com IA pausada no momento.<br />O robô está cuidando de tudo! 🤖✅</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {handoverLeads.map((lead) => (
+                                        <div key={lead.id} className="flex items-center justify-between p-4 bg-orange-50/30 border border-orange-100 rounded-2xl hover:bg-orange-50/50 transition-all shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                                                    <Smartphone className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-gray-800">{lead.remote_jid}</p>
+                                                    <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                                                        <Activity className="w-3 h-3" />
+                                                        Pausado em: {new Date(lead.created_at).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => reactivateAI(editingLeadsInstance.id, lead.remote_jid)}
+                                                className="border-orange-200 text-orange-600 hover:bg-orange-600 hover:text-white rounded-xl text-xs font-bold transition-all px-4"
+                                            >
+                                                Reativar IA
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
+                            <p className="text-[10px] text-gray-400">Ao clicar em "Reativar IA", o robô voltará a responder este contato imediatamente.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -514,17 +811,32 @@ interface InstanceCardProps {
     onToggleAI: (instance: any) => void;
     onEditAI: (instance: any) => void;
     onResetMemory: (id: string) => void;
+    onOpenHandover: (instance: any) => void;
+    onOpenLeads: (instance: any) => void;
 }
 
-const InstanceCard = ({ instance, secondsAgo, onDelete, onLogout, onGetQR, onPairing, onMassDispatch, onToggleAI, onEditAI, onResetMemory }: InstanceCardProps) => {
+const InstanceCard = ({
+    instance,
+    secondsAgo,
+    onDelete,
+    onLogout,
+    onGetQR,
+    onPairing,
+    onMassDispatch,
+    onToggleAI,
+    onEditAI,
+    onResetMemory,
+    onOpenHandover,
+    onOpenLeads
+}: InstanceCardProps) => {
     const [showMenu, setShowMenu] = useState(false);
     const [showAIMenu, setShowAIMenu] = useState(false);
 
     const menuItems = [
         { icon: Send, label: "DISPARO EM MASSA", color: "text-blue-600", action: () => { onMassDispatch(instance); setShowMenu(false); } },
         { icon: Bot, label: "AGENTE DE IA", color: "text-purple-600", action: () => { setShowAIMenu(true); } },
-        { icon: Users, label: "RODÍZIO DE ATENDIMENTO", color: "text-green-600", action: () => toast.info("Em breve: " + instance.name) },
-        { icon: Target, label: "LEADS EM ATENDIMENTO", color: "text-orange-600", action: () => toast.info("Em breve: " + instance.name) },
+        { icon: Users, label: "RODÍZIO DE ATENDIMENTO", color: "text-green-600", action: () => { onOpenHandover(instance); setShowMenu(false); } },
+        { icon: Target, label: "LEADS EM ATENDIMENTO", color: "text-orange-600", action: () => { onOpenLeads(instance); setShowMenu(false); } },
     ];
 
     const aiMenuItems = [
@@ -554,7 +866,14 @@ const InstanceCard = ({ instance, secondsAgo, onDelete, onLogout, onGetQR, onPai
                 setShowAIMenu(false);
             }
         },
-        { label: "Temas para Humano", emoji: "🤝" },
+        {
+            label: "Temas para Humano",
+            emoji: "🤝",
+            action: () => {
+                onOpenHandover(instance);
+                setShowAIMenu(false);
+            }
+        },
         { label: "Base de Conhecimento (PDF)", emoji: "📚" },
         { label: "Tempo de Reativação", emoji: "🕓" },
         { label: "Follow-ups", emoji: "🔔" },
