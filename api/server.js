@@ -453,18 +453,31 @@ app.post('/api/webhook', async (req, res) => {
         const fromMe = info.IsFromMe;
         const pushName = info.PushName || 'Lead';
 
+        console.log(`[WEBHOOK] Filtros Iniciais - Chat: ${chat}, isGroup: ${isGroup}, isBroadcast: ${isBroadcast}, fromMe: ${fromMe}`);
+
         // 3. Filters: No groups, no broadcast, no self-messages
-        if (isGroup || isBroadcast || fromMe) return;
+        if (isGroup || isBroadcast || fromMe) {
+            console.log(`[WEBHOOK] Mensagem filtrada/bloqueada (Group/Bcast/Me). Saindo.`);
+            return;
+        }
 
         const messageObj = msgEvent.Message;
-        if (!messageObj) return;
+        if (!messageObj) {
+            console.log(`[WEBHOOK] msgEvent.Message indefinido. Saindo.`);
+            return;
+        }
 
         const bodyText = messageObj.conversation ||
             messageObj.extendedTextMessage?.text ||
             messageObj.imageMessage?.caption ||
             messageObj.videoMessage?.caption || '';
 
-        if (!bodyText) return;
+        if (!bodyText) {
+            console.log(`[WEBHOOK] Nenhum texto localizado (bodyText vazio). Saindo.`);
+            return;
+        }
+
+        console.log(`[WEBHOOK] Texto extraído: "${bodyText.substring(0, 20)}...". Buscando instância do DB...`);
 
         // 4. Identify instance by wuzapi_token (sent as 'token' in webhook body by Wuzapi)
         const { data: instance, error } = await supabaseAdmin
@@ -474,11 +487,15 @@ app.post('/api/webhook', async (req, res) => {
             .single();
 
         if (error || !instance || !instance.ai_active) {
-            console.log('[WEBHOOK] Instância não encontrada ou AI inativa para token:', token?.substring(0, 5));
+            console.log(`[WEBHOOK] Instância DB não encontrada ou AI inativa para token: ${token?.substring(0, 5)}`);
             return;
         }
 
-        const remoteJid = info.Sender || info.Chat || '';
+        const rawJid = info.SenderAlt || info.Sender || info.Chat || '';
+        const remoteJid = rawJid.replace(/@.*$/, ''); // Extract clean phone number
+
+        console.log(`[WEBHOOK] Instância ativada encontrada! ID: ${instance.id}. RemoteJID limpo: ${remoteJid}`);
+
         const wuzapiBase = process.env.WUZAPI_URL;
         const wuzapiHeaders = { token: token };
 
@@ -490,16 +507,19 @@ app.post('/api/webhook', async (req, res) => {
         // 6. Humanization: Typing status simulation
 
         // Indicate "composing"
+        console.log(`[WEBHOOK] Disparando Wuzapi Typing Presence para ${from}...`);
         try {
             await axios.post(`${wuzapiBase}/chat/presence`, { Phone: from, State: 'composing' }, { headers: wuzapiHeaders });
         } catch (e) { console.error('Error setting typing status:', e.message); }
 
         // 7. Random Delay
+        console.log(`[WEBHOOK] Iniciando delay humano...`);
         const delayMin = instance.ai_delay_min || 2000;
         const delayMax = instance.ai_delay_max || 5000;
         const actualDelay = Math.floor(Math.random() * (delayMax - delayMin + 1)) + delayMin;
         await new Promise(r => setTimeout(r, actualDelay));
 
+        console.log(`[WEBHOOK] Construindo conversação base do ChatGPT...`);
         // 8. Handle Content (Multimodal & Audio)
         let userMessageContent = body;
 
@@ -550,6 +570,7 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         // 9. Call OpenAI GPT-4o-mini
+        console.log(`[WEBHOOK] Disparando OpenAI para gerar resposta...`);
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: messages,
@@ -557,12 +578,15 @@ app.post('/api/webhook', async (req, res) => {
         });
 
         const aiResponse = completion.choices[0].message.content;
+        console.log(`[WEBHOOK] OpenAI Resposta Txt: ${aiResponse.substring(0, 30)}... Enviando Zap...`);
 
         // 10. Send response back via Wuzapi
-        await axios.post(`${wuzapiBase}/chat/send/text`, {
+        const sendResponse = await axios.post(`${wuzapiBase}/chat/send/text`, {
             Phone: from,
             Body: aiResponse
         }, { headers: wuzapiHeaders });
+
+        console.log(`[WEBHOOK] Mensagem de envio Zap Concluída (Status: ${sendResponse.status}). Desativando Presence...`);
 
         // Indicate "paused"
         try {
