@@ -166,6 +166,7 @@ app.use(rateLimit({
     max: 120,
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { trustProxy: false },
     message: { error: 'Muitas requisições. Tente novamente em 1 minuto.' },
 }));
 

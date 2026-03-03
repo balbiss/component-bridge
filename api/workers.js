@@ -98,6 +98,10 @@ async function processCampaigns(supabase, helpers) {
                             payload.Caption = campaign.file_caption || body;
                         }
 
+                        // ── DEBUG LOGS ──────────────────────────────────
+                        console.log(`[WORKER] Calling Wuzapi: ${endpoint} | Target: ${targetPhone}`);
+                        console.log(`[WORKER] Payload: ${JSON.stringify(payload)}`);
+
                         const r = await wuzCall('POST', endpoint, payload, { token });
 
                         if (r.data?.success === false) {
