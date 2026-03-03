@@ -1,7 +1,8 @@
 // ============================================================
 // NexusBot API Server — Production-Grade (Multi-User/Scale)
 // ============================================================
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const cluster = require('cluster');
 const os = require('os');
@@ -156,6 +157,14 @@ async function getWuzapiUsers() {
 // ──────────────────────────────────────────────────────────────
 const PHONE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const phoneCache = new Map();
+
+// Helper: normalize JID (removes spaces, +, and non-digits)
+const normalizeJid = (jid) => {
+    if (!jid) return jid;
+    if (jid.includes('@')) return jid;
+    const clean = String(jid).replace(/[^0-9]/g, '');
+    return `${clean}@s.whatsapp.net`;
+};
 
 /**
  * Returns { valid: bool, jid: string|null }
@@ -719,7 +728,6 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
                 console.log(`[HANDOVER] Rodízio ativo, mas nenhum atendente encontrado. Usando backup: ${selectedPhone}`);
             }
         }
-
         if (selectedPhone) {
             const check = await checkPhoneOnWhatsApp(instance.token, selectedPhone);
             const normalizedTarget = check.valid && check.jid ? check.jid : normalizeJid(selectedPhone);
@@ -762,15 +770,14 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
                 console.error(`[HANDOVER-ERROR] Falha ao enviar notificação:`, notifyErr.message);
                 return false;
             }
+        } else {
+            console.warn(`[HANDOVER] Falha: Nenhum número de destino configurado.`);
+            return false;
         }
-    } else {
-        console.warn(`[HANDOVER] Falha: Nenhum número de destino configurado.`);
+    } catch (err) {
+        console.error(`[HANDOVER] Erro fatal no processo:`, err.message);
         return false;
     }
-} catch (err) {
-    console.error(`[HANDOVER] Erro fatal no processo:`, err.message);
-    return false;
-}
 }
 
 // GLOBAL WEBHOOK - Process Wuzapi Messages
