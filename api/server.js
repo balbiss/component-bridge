@@ -74,6 +74,42 @@ const normalizeBase64 = (str, forceMime) => {
     return str;
 };
 
+// Helper: robustly extract base64 from Wuzapi download responses
+const extractBase64FromResponse = (resData) => {
+    if (!resData) return '';
+    if (typeof resData === 'string') return resData;
+
+    // Check common top-level keys
+    if (typeof resData.data === 'string') return resData.data;
+    if (typeof resData.Data === 'string') return resData.Data;
+    if (typeof resData.base64 === 'string') return resData.base64;
+    if (typeof resData.file === 'string') return resData.file;
+
+    // Check nested keys (Wuzapi often nests inside 'data')
+    if (resData.data && typeof resData.data === 'object' && !Array.isArray(resData.data)) {
+        const nested = resData.data;
+        if (typeof nested.Data === 'string') return nested.Data;
+        if (typeof nested.data === 'string') return nested.data;
+        if (typeof nested.base64 === 'string') return nested.base64;
+        if (typeof nested.file === 'string') return nested.file;
+
+        // Fallback: search any key that looks like a base64 string
+        const keys = Object.keys(nested);
+        const b64Key = keys.find(k => typeof nested[k] === 'string' &&
+            (nested[k].length > 100 || nested[k].startsWith('data:')));
+        if (b64Key) return nested[b64Key];
+    }
+
+    // Last resort: search top-level keys again with more aggressive check
+    const topKeys = Object.keys(resData);
+    const topB64Key = topKeys.find(k => typeof resData[k] === 'string' &&
+        (resData[k].length > 100 || resData[k].startsWith('data:')));
+    if (topB64Key) return resData[topB64Key];
+
+    return '';
+};
+
+
 // Helper: call wuzapi with automatic header injection
 const wuzCall = (method, path, data, headers = {}) => {
     // Auto-normalize media payloads based on Wuzapi Spec
@@ -621,28 +657,10 @@ app.post('/api/webhook', async (req, res) => {
 
                 let buffer = null;
                 const resData = downloadRes.data;
-
                 console.log(`[WEBHOOK] Resposta do DownloadAudio: ${typeof resData === 'object' ? JSON.stringify(resData).substring(0, 150) : 'Tipo não-objeto'}`);
 
-                let b64Data = '';
-                if (typeof resData === 'string') {
-                    b64Data = resData;
-                } else if (resData && typeof resData.data === 'string') {
-                    b64Data = resData.data;
-                } else if (resData && typeof resData.base64 === 'string') {
-                    b64Data = resData.base64;
-                } else if (resData && typeof resData.file === 'string') {
-                    b64Data = resData.file;
-                } else if (resData && resData.data && typeof resData.data.data === 'string') {
-                    // Wuzapi often returns { data: { data: "base64..." } }
-                    b64Data = resData.data.data;
-                } else if (resData && resData.data && typeof resData.data === 'object' && !Array.isArray(resData.data)) {
-                    // Just in case there's another nested key
-                    const keys = Object.keys(resData.data);
-                    if (keys.length > 0 && typeof resData.data[keys[0]] === 'string') {
-                        b64Data = resData.data[keys[0]];
-                    }
-                }
+
+                let b64Data = extractBase64FromResponse(resData);
 
                 if (b64Data) {
                     // Remove prefixo data:audio/ogg;base64, se existir
@@ -704,14 +722,11 @@ app.post('/api/webhook', async (req, res) => {
                 });
 
                 const resData = downloadRes.data;
-                let b64Data = '';
+                // Log keys of response data to help debug unexpected structures
+                const resKeys = resData ? Object.keys(resData) : [];
+                console.log(`[WEBHOOK] Resposta DownloadImage recebida. Keys: [${resKeys.join(', ')}]. Status: ${downloadRes.status}`);
 
-                // Extração robusta do base64 (mesma lógica do áudio)
-                if (typeof resData === 'string') b64Data = resData;
-                else if (resData?.data && typeof resData.data === 'string') b64Data = resData.data;
-                else if (resData?.base64) b64Data = resData.base64;
-                else if (resData?.file) b64Data = resData.file;
-                else if (resData?.data?.data) b64Data = resData.data.data;
+                let b64Data = extractBase64FromResponse(resData);
 
                 if (b64Data) {
                     // Limpa prefixos duplicados se existirem
@@ -719,7 +734,8 @@ app.post('/api/webhook', async (req, res) => {
                     imageBase64 = `data:image/jpeg;base64,${b64Data}`;
                     console.log(`[WEBHOOK] Imagem baixada e convertida para Base64. Tamanho: ${imageBase64.length} chars`);
                 } else {
-                    console.error('[WEBHOOK] Falha ao extrair base64 da imagem.');
+                    console.error('[WEBHOOK] Falha ao extrair base64 da imagem. Chaves no resData:', resKeys);
+                    if (resData?.data) console.error('[WEBHOOK] Chaves dentro de resData.data:', Object.keys(resData.data));
                 }
             } catch (e) {
                 console.error('[WEBHOOK] Erro ao baixar imagem:', e.response?.data || e.message);
@@ -1291,16 +1307,7 @@ app.delete('/api/campaigns/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// ──────────────────────────────────────────────────────────────
-app.post('/api/webhook', async (req, res) => {
-    const payload = req.body;
-    // Process async without blocking the ACK — Wuzapi expects fast 200
-    setImmediate(() => {
-        // TODO: dispatch to user's configured webhook or AI pipeline
-        console.log('[WEBHOOK]', JSON.stringify(payload).substring(0, 200));
-    });
-    res.status(200).send('OK');
-});
+// (Duplicate removed)
 
 // ──────────────────────────────────────────────────────────────
 // GLOBAL ERROR HANDLER
