@@ -97,23 +97,25 @@ async function processCampaigns(supabase, helpers) {
                         let payload = { Phone: targetPhone };
                         let endpoint = '';
 
+                        const fileData = campaign.file_base64 || campaign.file_url; // Compatibilidade com nomes do banco
+
                         if (mediaType === 'text') {
                             endpoint = '/chat/send/text';
                             payload.Body = body;
                         } else if (mediaType === 'image') {
                             endpoint = '/chat/send/image';
-                            payload.Image = campaign.file_base64;
+                            payload.Image = fileData;
                             payload.Caption = campaign.file_caption || body;
                         } else if (mediaType === 'audio') {
                             endpoint = '/chat/send/audio';
-                            payload.Audio = campaign.file_base64;
+                            payload.Audio = fileData;
                         } else if (mediaType === 'video') {
                             endpoint = '/chat/send/video';
-                            payload.Video = campaign.file_base64;
+                            payload.Video = fileData;
                             payload.Caption = campaign.file_caption || body;
                         } else if (mediaType === 'document') {
                             endpoint = '/chat/send/document';
-                            payload.Document = campaign.file_base64;
+                            payload.Document = fileData;
                             payload.FileName = 'arquivo.pdf';
                             payload.Caption = campaign.file_caption || body;
                         }
@@ -124,8 +126,9 @@ async function processCampaigns(supabase, helpers) {
                         if (r.data?.success === false) throw new Error(r.data?.message || 'Wuzapi error');
                         status = 'success';
                     } catch (err) {
-                        errorMsg = err.response?.data?.message || err.message;
-                        console.error(`[WORKER] Erro em ${targetPhone}:`, errorMsg);
+                        const errorDetails = err.response?.data || err.message;
+                        errorMsg = typeof errorDetails === 'object' ? JSON.stringify(errorDetails) : errorDetails;
+                        console.error(`[WORKER] Erro 400 em ${targetPhone}:`, errorMsg);
                         status = 'error';
                     }
 
