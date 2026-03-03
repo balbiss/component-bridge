@@ -58,9 +58,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const fetchProfile = async (userId: string) => {
         console.log('Fetching profile for user:', userId);
         try {
-            // Set a shorter timeout for profile (5s)
+            // Set a longer timeout for profile (15s) to avoid race conditions on slow connections
             const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Profile fetch timeout (5s)')), 5000)
+                setTimeout(() => reject(new Error('Profile fetch timeout (15s)')), 15000)
             );
 
             const fetchPromise = supabase

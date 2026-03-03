@@ -355,6 +355,7 @@ app.post('/api/instances/:id/ai', authenticateToken, async (req, res) => {
                 console.log(`[AI-AUTO] Configurando webhook para instância ${id}: ${webhookUrl}`);
                 try {
                     await axios.post(`${process.env.WUZAPI_URL}/webhook`, {
+                        url: webhookUrl,
                         webhook: webhookUrl,
                         events: ['Message']
                     }, {
