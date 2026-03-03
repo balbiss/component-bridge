@@ -352,11 +352,15 @@ app.post('/api/instances/:id/ai', authenticateToken, async (req, res) => {
             const webhookUrl = process.env.WEBHOOK_URL;
 
             if (webhookUrl) {
-                console.log(`[AI-AUTO] Configurando webhook para instância ${id}: ${webhookUrl}`);
+                const finalUrl = webhookUrl.includes('?')
+                    ? `${webhookUrl}&token=${data.wuzapi_token}`
+                    : `${webhookUrl}?token=${data.wuzapi_token}`;
+
+                console.log(`[AI-AUTO] Configurando webhook para instância ${id}: ${finalUrl}`);
                 try {
                     // Try PUT first with Active: true (WebhookUpdate definition)
                     const payloadUpdate = {
-                        webhook: webhookUrl,
+                        webhook: finalUrl,
                         events: ['Message'],
                         Active: true
                     };
@@ -369,7 +373,7 @@ app.post('/api/instances/:id/ai', authenticateToken, async (req, res) => {
                     try {
                         // Fallback to POST (WebhookSet definition)
                         const payloadSet = {
-                            webhook: webhookUrl,
+                            webhook: finalUrl,
                             events: ['Message']
                         };
                         const resPost = await axios.post(`${process.env.WUZAPI_URL}/webhook`, payloadSet, {
@@ -422,32 +426,45 @@ app.post('/api/instances/:id/prompt', authenticateToken, async (req, res) => {
 // GLOBAL WEBHOOK - Process Wuzapi Messages
 app.post('/api/webhook', async (req, res) => {
     console.log('--- WUZAPI WEBHOOK RECEIVED ---');
-    console.log('Headers:', JSON.stringify(req.headers));
-    console.log('Body:', JSON.stringify(req.body).substring(0, 500)); // Log first 500 chars
+    console.log('Body snippet:', JSON.stringify(req.body).substring(0, 500));
 
     // Immediate response to Wuzapi to avoid timeouts
     res.sendStatus(200);
 
     try {
-        const { event, data, token } = req.body;
-        console.log(`[WEBHOOK] Event: ${event}, Token in body: ${token}, From: ${data?.from}`);
+        const token = req.query.token || req.headers.token || req.body.token;
+        const msgEvent = req.body.event;
 
-        // 1. Only process "Message" events
-        if (event !== 'Message') {
-            console.log(`[WEBHOOK] Ignoring non-Message event: ${event}`);
+        if (!token) {
+            console.log(`[WEBHOOK] Sem token na URL ou Headers, ignorando.`);
             return;
         }
 
-        // 2. Extract message details
-        const msg = data;
-        const from = msg.from; // JID or Phone
-        const isGroup = from.includes('@g.us');
-        const isBroadcast = from.includes('@broadcast') || from.includes('@newsletter');
-        const fromMe = msg.fromMe;
-        const pushName = msg.pushName || 'Lead';
+        // Wuzapi message events have Info inside event
+        if (!msgEvent || !msgEvent.Info) {
+            console.log(`[WEBHOOK] Ignorando evento não-Mensagem.`);
+            return;
+        }
+
+        const info = msgEvent.Info;
+        const chat = info.Chat || '';
+        const isGroup = info.IsGroup || chat.includes('@g.us');
+        const isBroadcast = chat.includes('@broadcast') || chat.includes('@newsletter');
+        const fromMe = info.IsFromMe;
+        const pushName = info.PushName || 'Lead';
 
         // 3. Filters: No groups, no broadcast, no self-messages
         if (isGroup || isBroadcast || fromMe) return;
+
+        const messageObj = msgEvent.Message;
+        if (!messageObj) return;
+
+        const bodyText = messageObj.conversation ||
+            messageObj.extendedTextMessage?.text ||
+            messageObj.imageMessage?.caption ||
+            messageObj.videoMessage?.caption || '';
+
+        if (!bodyText) return;
 
         // 4. Identify instance by wuzapi_token (sent as 'token' in webhook body by Wuzapi)
         const { data: instance, error } = await supabaseAdmin
@@ -456,15 +473,21 @@ app.post('/api/webhook', async (req, res) => {
             .eq('wuzapi_token', token)
             .single();
 
-        if (error || !instance || !instance.ai_active) return;
+        if (error || !instance || !instance.ai_active) {
+            console.log('[WEBHOOK] Instância não encontrada ou AI inativa para token:', token?.substring(0, 5));
+            return;
+        }
+
+        const remoteJid = info.Sender || info.Chat || '';
+        const wuzapiBase = process.env.WUZAPI_URL;
+        const wuzapiHeaders = { token: token };
 
         // 5. Build prompt and context
-        const body = msg.body || '';
+        const body = bodyText;
+        const from = remoteJid;
         const systemPrompt = instance.system_prompt || 'Você é um assistente virtual humano e prestativo.';
 
         // 6. Humanization: Typing status simulation
-        const wuzapiBase = process.env.WUZAPI_URL;
-        const wuzapiHeaders = { token: token };
 
         // Indicate "composing"
         try {
