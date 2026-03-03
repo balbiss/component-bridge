@@ -504,12 +504,13 @@ app.post('/api/webhook', async (req, res) => {
         let userMessageContent = body;
 
         // Audio -> Transcription (Whisper)
-        if ((msg.type === 'audio' || msg.type === 'ptt') && msg.audio) {
+        const isAudio = messageObj.audioMessage || messageObj.pttMessage;
+        if (isAudio) {
             try {
                 // Indicate "recording" status
                 await axios.post(`${wuzapiBase}/chat/presence`, { Phone: from, State: 'recording' }, { headers: wuzapiHeaders });
 
-                const audioUrl = msg.audio.url;
+                const audioUrl = isAudio.url;
                 if (audioUrl) {
                     const response = await axios.get(audioUrl, { responseType: 'arraybuffer' });
                     const buffer = Buffer.from(response.data);
@@ -540,10 +541,11 @@ app.post('/api/webhook', async (req, res) => {
         ];
 
         // Image -> Multimodal
-        if (msg.type === 'image' && msg.image) {
+        const isImage = messageObj.imageMessage;
+        if (isImage) {
             messages[1].content = [
                 { type: 'text', text: userMessageContent || 'O que você acha desta imagem?' },
-                { type: 'image_url', image_url: { url: msg.image.url || '' } }
+                { type: 'image_url', image_url: { url: isImage.url || '' } }
             ];
         }
 
