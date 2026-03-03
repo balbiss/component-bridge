@@ -107,9 +107,10 @@ async function processCampaigns(supabase, helpers) {
                         successCount++;
                         status = 'success';
                     } catch (err) {
-                        console.error(`[WORKER] Erro ao enviar para ${targetPhone}:`, err.message);
+                        const errorDetails = err.response?.data || err.message;
+                        console.error(`[WORKER] Erro ao enviar para ${targetPhone}:`, JSON.stringify(errorDetails));
                         errorCount++;
-                        errorMsg = err.message;
+                        errorMsg = err.response?.data?.message || err.message;
                         status = 'error';
                     }
 

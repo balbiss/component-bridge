@@ -144,6 +144,7 @@ const getSupabaseForUser = (token) =>
 // EXPRESS APP
 // ──────────────────────────────────────────────────────────────
 const app = express();
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 3003;
 
 // Security & perf middleware
@@ -942,6 +943,7 @@ function makeProxyHandler(wuzapiPath, { validatePhone = false } = {}) {
                 if (!targetPhone) return res.status(400).json({ error: 'Campo Phone é obrigatório' });
 
                 const check = await checkPhoneOnWhatsApp(inst.wuzapi_token, targetPhone);
+                console.log(`[CHECK] Phone ${targetPhone} result:`, JSON.stringify(check));
                 if (!check.valid) {
                     return res.status(422).json({
                         error: 'Número não está no WhatsApp',
