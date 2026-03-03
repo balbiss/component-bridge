@@ -715,12 +715,44 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
         if (targetPhone) {
             const normalizedTarget = normalizeJid(targetPhone);
             const normalizedLead = normalizeJid(remoteJid);
-            console.log(`[HANDOVER] Alvos Normalizados - Atendente: ${normalizedTarget}, Lead: ${normalizedLead}`);
+            console.log(`[HANDOVER] Verificando se o destino está no WhatsApp: ${normalizedTarget}`);
+
+            // --- NOVO: VALIDAÇÃO DE NÚMERO ---
+            try {
+                const checkRes = await wuzCall('POST', '/user/check', {
+                    Phone: [normalizedTarget.split('@')[0]]
+                }, wuzapiHeaders);
+
+                const userData = checkRes.data?.Users?.[0];
+                if (!userData?.IsInWhatsapp) {
+                    console.error(`[HANDOVER-VAL] ATENÇÃO: O número de destino ${normalizedTarget} NÃO possui WhatsApp. Abortando notificação.`);
+                    // Fallback para admin se o atendente falhar (e se o alvo já não for o admin)
+                    if (attendantId && instance.notification_phone && targetPhone !== instance.notification_phone) {
+                        console.log(`[HANDOVER-VAL] Tentando fallback para Telefone Admin: ${instance.notification_phone}`);
+                        const normalizedAdmin = normalizeJid(instance.notification_phone);
+                        const checkAdmin = await wuzCall('POST', '/user/check', { Phone: [normalizedAdmin.split('@')[0]] }, wuzapiHeaders);
+                        if (checkAdmin.data?.Users?.[0]?.IsInWhatsapp) {
+                            targetPhone = instance.notification_phone;
+                            // Recomeça o processo de envio com o admin (simplificado aqui)
+                        } else {
+                            return false; // Ambos falharam
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+            } catch (vError) {
+                console.warn(`[HANDOVER-VAL] Falha ao validar número via Wuzapi: ${vError.message}. Prosseguindo mesmo assim.`);
+            }
+
+            const finalTarget = normalizeJid(targetPhone);
+            console.log(`[HANDOVER] Alvos Normalizados - Atendente/Admin: ${finalTarget}, Lead: ${normalizedLead}`);
+
             // 4. Send notification via Wuzapi to the ATTENDANT or ADMIN
             const notificationText = `*🚨 [NOTIFICAÇÃO DE HANDOVER] 🚨*\n\n*Lead:* ${pushName} (${remoteJid})\n\n*Resumo da Conversa:*\n${summary}\n\n_A IA foi pausada para este contato._`;
 
             await wuzCall('POST', '/chat/send/text', {
-                Phone: normalizedTarget,
+                Phone: finalTarget,
                 Body: notificationText
             }, wuzapiHeaders);
 
