@@ -616,10 +616,48 @@ app.post('/api/webhook', async (req, res) => {
             }
         }
 
+        // --- 8.5 RECOVERING MEMORY & INJECTING AS CONTEXT ---
+        let chatContext = [];
+        try {
+            console.log(`[WEBHOOK] Buscando memória da instância para o número ${remoteJid}...`);
+            // Fetch last 15 interactions
+            const { data: dbHistory, error: historyErr } = await supabaseAdmin
+                .from('chat_history')
+                .select('role, content')
+                .eq('instance_id', instance.id)
+                .eq('remote_jid', remoteJid)
+                .order('created_at', { ascending: false })
+                .limit(15);
+
+            if (historyErr) {
+                console.error(`[WEBHOOK] Erro ao buscar memória do banco:`, historyErr);
+            } else if (dbHistory && dbHistory.length > 0) {
+                // Reverse to chronological order for OpenAI
+                chatContext = dbHistory.reverse().map(h => ({ role: h.role, content: h.content }));
+                console.log(`[WEBHOOK] Memória carregada com sucesso! (${chatContext.length} mensagens anteriores)`);
+            }
+        } catch (e) {
+            console.error(`[WEBHOOK] Exception ao buscar memória:`, e.message);
+        }
+
         const messages = [
             { role: 'system', content: `${systemPrompt}\nNome do lead: ${pushName}` },
+            ...chatContext,
             { role: 'user', content: userMessageContent }
         ];
+
+        // --- 8.6 SAVE USER MESSAGE TO MEMORY DB ---
+        try {
+            await supabaseAdmin.from('chat_history').insert({
+                instance_id: instance.id,
+                remote_jid: remoteJid,
+                role: 'user',
+                content: userMessageContent
+            });
+            console.log(`[WEBHOOK] Mensagem do usuário salva no banco de memórias.`);
+        } catch (e) {
+            console.error(`[WEBHOOK] Erro ao salvar mensagem do usúario no db:`, e.message);
+        }
 
         // Image -> Multimodal
         if (isImage) {
@@ -640,7 +678,20 @@ app.post('/api/webhook', async (req, res) => {
         const aiResponse = completion.choices[0].message.content;
         console.log(`[WEBHOOK] OpenAI Resposta Txt: ${aiResponse.substring(0, 30)}... Enviando Zap...`);
 
-        // 10. Send response back via Wuzapi
+        // --- 10. SAVE AI ASSISTANT MESSAGE TO MEMORY DB ---
+        try {
+            await supabaseAdmin.from('chat_history').insert({
+                instance_id: instance.id,
+                remote_jid: remoteJid,
+                role: 'assistant',
+                content: aiResponse
+            });
+            console.log(`[WEBHOOK] Resposta da IA salva no banco de memórias.`);
+        } catch (e) {
+            console.error(`[WEBHOOK] Erro ao salvar resposta da IA no db:`, e.message);
+        }
+
+        // 11. Send response back via Wuzapi
         const sendResponse = await axios.post(`${wuzapiBase}/chat/send/text`, {
             Phone: from,
             Body: aiResponse
