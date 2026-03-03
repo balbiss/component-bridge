@@ -649,7 +649,7 @@ app.post('/api/instances/:id/handover/leads/:jid/reactivate', authenticateToken,
 // ──────────────────────────────────────────────────────────────
 // HUMAN HANDOVER HELPER
 // ──────────────────────────────────────────────────────────────
-async function executeHandover(instance, remoteJid, pushName, messages, wuzapiBase, wuzapiHeaders) {
+async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHeaders) {
     console.log(`[HANDOVER] Iniciando processo de transição para humano... Lead: ${pushName} (${remoteJid})`);
     try {
         // 1. Disable AI for this contact
@@ -694,17 +694,17 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiBa
             // 4. Send notification via Wuzapi to the ATTENDANT or ADMIN
             const notificationText = `*🚨 [NOTIFICAÇÃO DE HANDOVER] 🚨*\n\n*Lead:* ${pushName} (${remoteJid})\n\n*Resumo da Conversa:*\n${summary}\n\n_A IA foi pausada para este contato._`;
 
-            await axios.post(`${wuzapiBase}/chat/sendtext`, {
+            await wuzCall('POST', '/chat/send/text', {
                 Phone: targetPhone,
                 Body: notificationText
-            }, { headers: wuzapiHeaders });
+            }, wuzapiHeaders);
 
             // --- 4.5 NOTIFY THE LEAD ---
             const leadTransferMessage = `Entendi, ${pushName}. Estou transferindo sua conversa para um de nossos atendentes agora mesmo. Por favor, aguarde um momento! 🤝`;
-            await axios.post(`${wuzapiBase}/chat/sendtext`, {
+            await wuzCall('POST', '/chat/send/text', {
                 Phone: remoteJid,
                 Body: leadTransferMessage
-            }, { headers: wuzapiHeaders });
+            }, wuzapiHeaders);
 
             // 5. Update last_handover_at if we used an attendant
             if (attendantId) {
@@ -790,8 +790,6 @@ app.post('/api/webhook', async (req, res) => {
             .select('*')
             .eq('wuzapi_token', token)
             .single();
-
-        console.log(`[WEBHOOK] DB Query result para token "${token}": Error: ${error ? JSON.stringify(error) : 'null'}, Instance found: ${!!instance}, AI Active: ${instance?.ai_active}, Triggers: "${instance?.human_handover_triggers}"`);
 
         if (error || !instance || !instance.ai_active) {
             console.log(`[WEBHOOK] Instância DB não encontrada ou AI inativa para token: ${token}. Abortando.`);
@@ -1000,7 +998,7 @@ app.post('/api/webhook', async (req, res) => {
 
         if (hasTrigger) {
             console.log(`[HANDOVER] Gatilho literal detectado: "${userMessageContent}".`);
-            await executeHandover(instance, remoteJid, pushName, messages, wuzapiBase, wuzapiHeaders);
+            await executeHandover(instance, remoteJid, pushName, messages, wuzapiHeaders);
             return;
         }
 
@@ -1039,7 +1037,7 @@ app.post('/api/webhook', async (req, res) => {
         // --- 9.5 SMART HANDOVER DETECTION ---
         if (aiResponse.includes('[HANDOVER]')) {
             console.log(`[HANDOVER] Intent Inteligente detectado pela IA. Iniciando transição...`);
-            await executeHandover(instance, remoteJid, pushName, messages, wuzapiBase, wuzapiHeaders);
+            await executeHandover(instance, remoteJid, pushName, messages, wuzapiHeaders);
             return;
         }
 
