@@ -163,26 +163,53 @@ const phoneCache = new Map();
  */
 async function checkPhoneOnWhatsApp(instanceToken, phone) {
     // Normalize: strip +, spaces, dashes
-    const normalized = String(phone).replace(/[^0-9]/g, '');
-    const cacheKey = `${instanceToken}:${normalized}`;
+    const raw = String(phone).replace(/[^0-9]/g, '');
+    const cacheKey = `${instanceToken}:${raw}`;
 
     const hit = phoneCache.get(cacheKey);
     if (hit && Date.now() - hit.ts < PHONE_CACHE_TTL) return hit.result;
 
+    const tryCheck = async (num) => {
+        try {
+            const r = await wuzCall('POST', '/user/check', { Phone: [num] }, { token: instanceToken });
+            const users = r.data?.data?.Users || r.data?.Users || [];
+            return users.find(u => u.IsInWhatsapp === true);
+        } catch (e) {
+            console.error(`[WUZAPI-CHECK-ERR] Error checking ${num}:`, e.message);
+            return null;
+        }
+    };
+
     try {
-        const r = await wuzCall('POST', '/user/check', { Phone: [normalized] }, { token: instanceToken });
-        const users = r.data?.data?.Users || [];
-        const user = users.find(u => u.Query === normalized || u.Query === phone);
+        let user = await tryCheck(raw);
+
+        // Se é Brasil (55) e não achou, tentamos a variação de 12/13 dígitos
+        if (!user && raw.startsWith('55')) {
+            let alternative = null;
+            if (raw.length === 13) {
+                // Tira o 9 (formato 12 dígitos)
+                alternative = raw.substring(0, 4) + raw.substring(5);
+            } else if (raw.length === 12) {
+                // Coloca o 9 (formato 13 dígitos)
+                alternative = raw.substring(0, 4) + '9' + raw.substring(4);
+            }
+
+            if (alternative) {
+                console.log(`[WUZAPI-CHECK] Not found with ${raw}. Retrying with ${alternative}...`);
+                user = await tryCheck(alternative);
+            }
+        }
+
         const result = {
-            valid: user?.IsInWhatsapp === true,
+            valid: !!user,
             jid: user?.JID || null,
             verifiedName: user?.VerifiedName || null,
         };
         phoneCache.set(cacheKey, { result, ts: Date.now() });
         return result;
-    } catch {
-        // On check failure, allow the send anyway (fail-open)
-        return { valid: true, jid: null, verifiedName: null };
+    } catch (err) {
+        console.error(`[WUZAPI-CHECK-FATAL] ${err.message}`);
+        return { valid: true, jid: null, verifiedName: null }; // Fail-open
     }
 }
 
@@ -652,24 +679,6 @@ app.post('/api/instances/:id/handover/leads/:jid/reactivate', authenticateToken,
 async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHeaders) {
     console.log(`[HANDOVER] Iniciando processo para ${pushName} (${remoteJid}). Round-Robin Ativo: ${instance.round_robin_active}`);
 
-    // Helper para normalizar JID de números brasileiros (remover 9 redundante se necessário)
-    const normalizeJid = (jid) => {
-        if (!jid) return jid;
-        let clean = jid.split('@')[0].replace(/[^0-9]/g, '');
-        // Se é Brasil (55) e tem 13 dígitos (com o 9 extra)
-        if (clean.startsWith('55') && clean.length === 13) {
-            const ddd = parseInt(clean.substring(2, 4));
-            // DDDs que quase sempre usam o 9 no JID do WhatsApp (Sul/Sudeste + Para 91)
-            if ((ddd >= 11 && ddd <= 28) || (ddd === 91)) {
-                return `${clean}@s.whatsapp.net`;
-            }
-            // Para outros, tentamos o formato de 12 dígitos (removendo o 9 extra após o 55+DDD)
-            const withoutNine = clean.substring(0, 4) + clean.substring(5);
-            console.log(`[HANDOVER-NORM] Sugerindo 12 dígitos para DDD ${ddd}: ${withoutNine}`);
-            return `${withoutNine}@s.whatsapp.net`;
-        }
-        return jid.includes('@') ? jid : `${clean}@s.whatsapp.net`;
-    };
     try {
         // 1. Disable AI for this contact
         await supabaseAdmin.from('ai_disabled_contacts').upsert({
@@ -689,12 +698,12 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
         });
         const summary = summaryCompletion.choices[0].message.content;
 
-        let targetPhone = instance.notification_phone;
+        let selectedPhone = instance.notification_phone;
         let attendantId = null;
 
         // 3. Find next attendant (Solo se Round-Robin estiver ativo)
         if (instance.round_robin_active !== false) {
-            const { data: attendants, error: attError } = await supabaseAdmin
+            const { data: attendants } = await supabaseAdmin
                 .from('attendants')
                 .select('*')
                 .eq('instance_id', instance.id)
@@ -703,91 +712,65 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
 
             if (attendants && attendants.length > 0) {
                 const nextAttendant = attendants[0];
-                targetPhone = nextAttendant.phone;
+                selectedPhone = nextAttendant.phone;
                 attendantId = nextAttendant.id;
-                console.log(`[HANDOVER] Rodízio: Selecionado atendente ${nextAttendant.name} (${targetPhone})`);
+                console.log(`[HANDOVER] Rodízio: Selecionado atendente ${nextAttendant.name} (${selectedPhone})`);
             } else {
-                console.log(`[HANDOVER] Rodízio ativo, mas nenhum atendente encontrado. Usando backup: ${targetPhone}`);
+                console.log(`[HANDOVER] Rodízio ativo, mas nenhum atendente encontrado. Usando backup: ${selectedPhone}`);
             }
-        } else {
-            console.log(`[HANDOVER] Rodízio inativo. Usando telefone admin fixo: ${targetPhone}`);
         }
 
-        if (targetPhone) {
-            const normalizedTarget = normalizeJid(targetPhone);
+        if (selectedPhone) {
+            const check = await checkPhoneOnWhatsApp(instance.token, selectedPhone);
+            const normalizedTarget = check.valid && check.jid ? check.jid : normalizeJid(selectedPhone);
             const normalizedLead = normalizeJid(remoteJid);
-            console.log(`[HANDOVER] Verificando se o destino está no WhatsApp: ${normalizedTarget}`);
 
-            // --- NOVO: VALIDAÇÃO DE NÚMERO COM RETRY ---
-            let isValid = false;
+            console.log(`[HANDOVER] Verificando destino: ${selectedPhone} -> JID: ${normalizedTarget} (Valid: ${check.valid})`);
+
+            if (!check.valid && !instance.notification_phone) {
+                console.error(`[HANDOVER-VAL] Falha crítica: Destino inválido e sem telefone admin.`);
+                return false;
+            }
+
+            // Se o atendente falhou mas temos um admin, tentamos o admin
+            let finalJid = normalizedTarget;
+            if (!check.valid && instance.notification_phone && selectedPhone !== instance.notification_phone) {
+                console.warn(`[HANDOVER-VAL] Atendente inválido. Tentando fallback para Admin...`);
+                const adminCheck = await checkPhoneOnWhatsApp(instance.token, instance.notification_phone);
+                if (adminCheck.valid && adminCheck.jid) {
+                    finalJid = adminCheck.jid;
+                } else {
+                    console.error(`[HANDOVER-VAL] Admin também inválido.`);
+                    return false;
+                }
+            }
+
+            console.log(`[HANDOVER] Enviando notificação para JID: ${finalJid}`);
+
+            const text = `🚨 *NOVO TRANSBORDO SOLICITADO* 🚨\n\n👤 *Lead:* ${pushName}\n📱 *Número:* ${remoteJid.split('@')[0]}\n\n📝 *Resumo da IA:*\n${summary}\n\n🔗 *Conversa:* https://wa.me/${remoteJid.split('@')[0]}`;
+
             try {
-                const checkRes = await wuzCall('POST', '/user/check', { Phone: [normalizedTarget.split('@')[0]] }, wuzapiHeaders);
-                isValid = checkRes.data?.Users?.[0]?.IsInWhatsapp;
+                await wuzCall('POST', '/chat/send/text', { Phone: finalJid, Body: text }, wuzapiHeaders);
 
-                // Se falhou e tinha 12 dígitos, tenta com 13 (adicionando o 9 de volta)
-                if (!isValid && normalizedTarget.length === 27) { // 55 + DDD + 8 extras = 12 chars
-                    const withNine = normalizedTarget.substring(0, 4) + '9' + normalizedTarget.substring(4);
-                    console.log(`[HANDOVER-VAL] Falha com 12 dígitos. Tentando retry com 13: ${withNine}`);
-                    const retryRes = await wuzCall('POST', '/user/check', { Phone: [withNine.split('@')[0]] }, wuzapiHeaders);
-                    if (retryRes.data?.Users?.[0]?.IsInWhatsapp) {
-                        targetPhone = withNine;
-                        isValid = true;
-                    }
+                // Update last_handover_at if it was a round-robin attendant
+                if (attendantId) {
+                    await supabaseAdmin.from('attendants').update({ last_handover_at: new Date().toISOString() }).eq('id', attendantId);
                 }
 
-                if (!isValid) {
-                    console.error(`[HANDOVER-VAL] ATENÇÃO: O número ${normalizedTarget} NÃO possui WhatsApp.`);
-                    // Fallback para admin se o atendente falhar
-                    if (attendantId && instance.notification_phone && targetPhone !== instance.notification_phone) {
-                        console.log(`[HANDOVER-VAL] Tentando fallback para Telefone Admin: ${instance.notification_phone}`);
-                        const normalizedAdmin = normalizeJid(instance.notification_phone);
-                        const checkAdmin = await wuzCall('POST', '/user/check', { Phone: [normalizedAdmin.split('@')[0]] }, wuzapiHeaders);
-                        if (checkAdmin.data?.Users?.[0]?.IsInWhatsapp) {
-                            targetPhone = instance.notification_phone;
-                            isValid = true;
-                        }
-                    }
-                }
-            } catch (vError) {
-                console.warn(`[HANDOVER-VAL] Falha na validação: ${vError.message}. Prosseguindo por fé.`);
-                isValid = true;
+                return true;
+            } catch (notifyErr) {
+                console.error(`[HANDOVER-ERROR] Falha ao enviar notificação:`, notifyErr.message);
+                return false;
             }
-
-            if (!isValid) return false;
-
-            const finalTarget = normalizeJid(targetPhone);
-            const finalLead = normalizeJid(remoteJid);
-
-            // 4. Send notification via Wuzapi to the ATTENDANT or ADMIN
-            const notificationText = `*🚨 [NOTIFICAÇÃO DE HANDOVER] 🚨*\n\n*Lead:* ${pushName} (${remoteJid})\n\n*Resumo da Conversa:*\n${summary}\n\n_A IA foi pausada para este contato._`;
-
-            await wuzCall('POST', '/chat/send/text', {
-                Phone: finalTarget,
-                Body: notificationText
-            }, wuzapiHeaders);
-
-            // --- 4.5 NOTIFY THE LEAD ---
-            const leadTransferMessage = `Entendi, ${pushName}. Estou transferindo sua conversa para um de nossos atendentes agora mesmo. Por favor, aguarde um momento! 🤝`;
-            await wuzCall('POST', '/chat/send/text', {
-                Phone: normalizedLead,
-                Body: leadTransferMessage
-            }, wuzapiHeaders);
-
-            // 5. Update last_handover_at if we used an attendant
-            if (attendantId) {
-                await supabaseAdmin.from('attendants').update({ last_handover_at: new Date().toISOString() }).eq('id', attendantId);
-            }
-
-            console.log(`[HANDOVER] Notificações enviadas com sucesso.`);
-            return true;
-        } else {
-            console.warn(`[HANDOVER] Falha: Nenhum número de destino configurado.`);
-            return false;
         }
-    } catch (err) {
-        console.error(`[HANDOVER] Erro fatal no processo:`, err.message);
+    } else {
+        console.warn(`[HANDOVER] Falha: Nenhum número de destino configurado.`);
         return false;
     }
+} catch (err) {
+    console.error(`[HANDOVER] Erro fatal no processo:`, err.message);
+    return false;
+}
 }
 
 // GLOBAL WEBHOOK - Process Wuzapi Messages
