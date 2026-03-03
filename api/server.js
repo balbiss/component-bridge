@@ -714,7 +714,7 @@ app.post('/api/webhook', async (req, res) => {
             .eq('wuzapi_token', token)
             .single();
 
-        console.log(`[WEBHOOK] DB Query result para token "${token}": Error: ${error ? JSON.stringify(error) : 'null'}, Instance found: ${!!instance}, AI Active: ${instance?.ai_active}`);
+        console.log(`[WEBHOOK] DB Query result para token "${token}": Error: ${error ? JSON.stringify(error) : 'null'}, Instance found: ${!!instance}, AI Active: ${instance?.ai_active}, Triggers: "${instance?.human_handover_triggers}"`);
 
         if (error || !instance || !instance.ai_active) {
             console.log(`[WEBHOOK] Instância DB não encontrada ou AI inativa para token: ${token}. Abortando.`);
@@ -913,7 +913,12 @@ app.post('/api/webhook', async (req, res) => {
         // --- 8.5.5 CHECK FOR HANDOVER TRIGGERS ---
         const triggers = (instance.human_handover_triggers || '').split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
         const userMsgLower = userMessageContent.toLowerCase();
+
+        console.log(`[HANDOVER-DEBUG] Triggers Normalizados: [${triggers.join(', ')}]`);
+        console.log(`[HANDOVER-DEBUG] Mensagem do Usuário (Lower): "${userMsgLower}"`);
+
         const hasTrigger = triggers.some(t => userMsgLower.includes(t));
+        console.log(`[HANDOVER-DEBUG] Resultado hasTrigger: ${hasTrigger}`);
 
         if (hasTrigger) {
             console.log(`[HANDOVER] Gatilho detectado: "${userMessageContent}". Iniciando transição para humano...`);
