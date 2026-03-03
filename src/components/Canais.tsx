@@ -201,6 +201,17 @@ const Canais = () => {
         }
     };
 
+    // ── Limpar Memória IA ──────────────────────────────────────────
+    const resetAIMemory = async (instanceId: string) => {
+        try {
+            const headers = await getAuthHeader();
+            await axios.delete(`${API}/instances/${instanceId}/memory`, { headers });
+            toast.success("Memória do Agente limpa com sucesso! 🧹✨");
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Erro ao limpar memória do agente");
+        }
+    };
+
 
     // ── Toggle AI Agent ──────────────────────────────────────────
     const toggleAIAgent = async (instance: any) => {
@@ -288,6 +299,7 @@ const Canais = () => {
                         onMassDispatch={setMassDispatchInstance}
                         onToggleAI={toggleAIAgent}
                         onEditAI={openAIModal}
+                        onResetMemory={resetAIMemory}
                     />
                 ))}
             </div>
@@ -501,9 +513,10 @@ interface InstanceCardProps {
     onMassDispatch: (instance: any) => void;
     onToggleAI: (instance: any) => void;
     onEditAI: (instance: any) => void;
+    onResetMemory: (id: string) => void;
 }
 
-const InstanceCard = ({ instance, secondsAgo, onDelete, onLogout, onGetQR, onPairing, onMassDispatch, onToggleAI, onEditAI }: InstanceCardProps) => {
+const InstanceCard = ({ instance, secondsAgo, onDelete, onLogout, onGetQR, onPairing, onMassDispatch, onToggleAI, onEditAI, onResetMemory }: InstanceCardProps) => {
     const [showMenu, setShowMenu] = useState(false);
     const [showAIMenu, setShowAIMenu] = useState(false);
 
@@ -528,6 +541,16 @@ const InstanceCard = ({ instance, secondsAgo, onDelete, onLogout, onGetQR, onPai
             emoji: "📝",
             action: () => {
                 onEditAI(instance);
+                setShowAIMenu(false);
+            }
+        },
+        {
+            label: "Resetar Memória",
+            emoji: "🧹",
+            action: () => {
+                if (window.confirm("Isso apagará o histórico da IA para esta instância e ela esquecerá todo o contexto recente. Confirmar?")) {
+                    onResetMemory(instance.id);
+                }
                 setShowAIMenu(false);
             }
         },

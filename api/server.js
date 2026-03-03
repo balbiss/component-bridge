@@ -417,7 +417,56 @@ app.post('/api/instances/:id/prompt', authenticateToken, async (req, res) => {
             .single();
 
         if (error) throw error;
+
+        // --- AUTOMATIC MEMORY WIPE IF PROMPT CHANGED ---
+        if (system_prompt !== undefined) {
+            try {
+                const { error: resetErr } = await supabaseAdmin
+                    .from('chat_history')
+                    .delete()
+                    .eq('instance_id', id);
+                if (resetErr) {
+                    console.error(`[MEMORY] Auto-wipe falhou ao atualizar o prompt da instancia ${id}`, resetErr);
+                } else {
+                    console.log(`[MEMORY] Histórico limpo automaticamente para a instância ${id} devido à mudança de prompt.`);
+                }
+            } catch (wErr) {
+                console.error('[MEMORY] Erro fatal no wipe do prompt:', wErr.message);
+            }
+        }
+
         res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /api/instances/:id/memory - manual memory reset
+app.delete('/api/instances/:id/memory', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Verify ownership
+        const { data: inst, error: instErr } = await supabaseAdmin
+            .from('instances')
+            .select('id')
+            .eq('id', id)
+            .eq('user_id', req.user.id)
+            .single();
+
+        if (instErr || !inst) {
+            return res.status(403).json({ error: 'Acesso negado ou instância não encontrada.' });
+        }
+
+        const { error } = await supabaseAdmin
+            .from('chat_history')
+            .delete()
+            .eq('instance_id', id);
+
+        if (error) throw error;
+
+        console.log(`[MEMORY] Histórico limpo MANUALMENTE para a instância ${id}.`);
+        res.json({ success: true, message: 'Memória limpa com sucesso' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
