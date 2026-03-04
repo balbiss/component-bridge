@@ -710,14 +710,40 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
         }
         // ───────────────────────────────────────────────────────────────
 
-        // 3. Generate summary
-        console.log(`[HANDOVER] Gerando resumo da conversa para o atendente...`);
+        // 3. Generate summary — filtra [HANDOVER] para não contaminar o resumo
+        console.log(`[HANDOVER] Gerando resumo detalhado da conversa para o atendente...`);
+
+        const summaryMessages = messages
+            .filter(m => m.role !== 'system')
+            .filter(m => typeof m.content === 'string' && !m.content.includes('[HANDOVER]'))
+            .map(m => ({ role: m.role, content: m.content }));
+
         const summaryCompletion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
-                { role: 'system', content: 'Você é um assistente que resume conversas de WhatsApp para atendentes humanos. Gere um resumo curto e objetivo do que o lead deseja.' },
-                ...messages
-            ]
+                {
+                    role: 'system',
+                    content: `Você é um assistente especializado em criar briefings para atendentes de suporte no WhatsApp.
+Analise a conversa abaixo e gere um briefing COMPLETO e DETALHADO no seguinte formato exato:
+
+📋 *BRIEFING DO ATENDENTE*
+
+🎯 *O que o lead quer:*
+[Descreva em 1-2 frases diretas o principal objetivo/problema do lead]
+
+💬 *Resumo da conversa:*
+[Liste os pontos principais discutidos, em tópicos com • ]
+
+❓ *Informações relevantes coletadas:*
+[Liste dados importantes que o lead mencionou: nome, produto de interesse, urgência, dúvidas específicas, etc.]
+
+⚡ *Prioridade sugerida:* [Alta / Média / Baixa] — [justificativa rápida]
+
+Seja objetivo e completo. O atendente NÃO lerá a conversa original, então inclua TUDO que for relevante.`
+                },
+                ...summaryMessages
+            ],
+            max_tokens: 600
         });
         const summary = summaryCompletion.choices[0].message.content;
 
@@ -753,16 +779,16 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
                 return false;
             }
 
-            // Wuzapi espera Phone como número limpo (sem @s.whatsapp.net)
+            // Wuzapi espera Phone como número limpo (sem @s.whatsapp.net).
+            // Usamos o número original do banco para evitar perda do 9 no JID canônico.
             let finalPhone;
-            if (check.valid && check.jid) {
-                finalPhone = check.jid.split('@')[0]; // extrai apenas os dígitos do JID
+            if (check.valid) {
+                finalPhone = String(selectedPhone).replace(/[^0-9]/g, '');
             } else if (!check.valid && instance.notification_phone && selectedPhone !== instance.notification_phone) {
-                // Atendente inválido: tenta o admin como fallback
                 console.warn(`[HANDOVER-VAL] Atendente inválido. Tentando fallback para Admin (${instance.notification_phone})...`);
                 const adminCheck = await checkPhoneOnWhatsApp(instance.wuzapi_token, instance.notification_phone);
-                if (adminCheck.valid && adminCheck.jid) {
-                    finalPhone = adminCheck.jid.split('@')[0];
+                if (adminCheck.valid) {
+                    finalPhone = String(instance.notification_phone).replace(/[^0-9]/g, '');
                 } else {
                     console.error(`[HANDOVER-VAL] Admin também inválido.`);
                     return false;
@@ -773,7 +799,7 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
 
             console.log(`[HANDOVER] Enviando notificação para ATENDENTE (Phone: ${finalPhone})...`);
 
-            const text = `🚨 *NOVO TRANSBORDO SOLICITADO* 🚨\n\n👤 *Lead:* ${pushName}\n📱 *Número:* ${leadPhone}\n\n📝 *Resumo da IA:*\n${summary}\n\n🔗 *Conversa:* https://wa.me/${leadPhone}`;
+            const text = `🚨 *NOVO TRANSBORDO SOLICITADO* 🚨\n\n👤 *Lead:* ${pushName}\n📱 *Número:* ${leadPhone}\n\n${summary}\n\n🔗 *Iniciar conversa:* https://wa.me/${leadPhone}`;
 
             try {
                 const notifyRes = await wuzCall('POST', '/chat/send/text', { Phone: finalPhone, Body: text }, wuzapiHeaders);
@@ -784,7 +810,6 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
                     return false;
                 }
 
-                // Update last_handover_at if it was a round-robin attendant
                 if (attendantId) {
                     await supabaseAdmin.from('attendants').update({ last_handover_at: new Date().toISOString() }).eq('id', attendantId);
                     console.log(`[HANDOVER] last_handover_at atualizado para atendente ID: ${attendantId}`);
@@ -804,6 +829,8 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
         return false;
     }
 }
+
+
 
 
 // GLOBAL WEBHOOK - Process Wuzapi Messages
