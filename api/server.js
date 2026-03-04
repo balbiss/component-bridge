@@ -696,7 +696,21 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
             active: true
         });
 
-        // 2. Generate summary
+        // ── 2. Notificar o LEAD imediatamente ──────────────────────────
+        const leadPhone = String(remoteJid).replace(/[^0-9]/g, '');
+        console.log(`[HANDOVER] Notificando LEAD (${leadPhone}) que a transferência começou...`);
+        try {
+            const leadNotifyRes = await wuzCall('POST', '/chat/send/text', {
+                Phone: leadPhone,
+                Body: `✅ Entendido! Estou transferindo você para um de nossos atendentes agora. Por favor, aguarde um momento. 🤝`
+            }, wuzapiHeaders);
+            console.log(`[HANDOVER] Notificação ao LEAD: success=${leadNotifyRes.data?.success}, id=${leadNotifyRes.data?.data?.Id}`);
+        } catch (leadErr) {
+            console.error(`[HANDOVER-ERROR] Falha ao notificar o LEAD:`, leadErr.response?.data || leadErr.message);
+        }
+        // ───────────────────────────────────────────────────────────────
+
+        // 3. Generate summary
         console.log(`[HANDOVER] Gerando resumo da conversa para o atendente...`);
         const summaryCompletion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -710,7 +724,7 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
         let selectedPhone = instance.notification_phone;
         let attendantId = null;
 
-        // 3. Find next attendant (Solo se Round-Robin estiver ativo)
+        // 4. Find next attendant (Solo se Round-Robin estiver ativo)
         if (instance.round_robin_active !== false) {
             const { data: attendants } = await supabaseAdmin
                 .from('attendants')
@@ -728,46 +742,57 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
                 console.log(`[HANDOVER] Rodízio ativo, mas nenhum atendente encontrado. Usando backup: ${selectedPhone}`);
             }
         }
+
         if (selectedPhone) {
             const check = await checkPhoneOnWhatsApp(instance.wuzapi_token, selectedPhone);
-            const normalizedTarget = check.valid && check.jid ? check.jid : normalizeJid(selectedPhone);
-            const normalizedLead = normalizeJid(remoteJid);
 
-            console.log(`[HANDOVER] Verificando destino: ${selectedPhone} -> JID: ${normalizedTarget} (Valid: ${check.valid})`);
+            console.log(`[HANDOVER] Verificando destino: ${selectedPhone} -> Valid: ${check.valid}, JID: ${check.jid}`);
 
             if (!check.valid && !instance.notification_phone) {
                 console.error(`[HANDOVER-VAL] Falha crítica: Destino inválido e sem telefone admin.`);
                 return false;
             }
 
-            // Se o atendente falhou mas temos um admin, tentamos o admin
-            let finalJid = normalizedTarget;
-            if (!check.valid && instance.notification_phone && selectedPhone !== instance.notification_phone) {
-                console.warn(`[HANDOVER-VAL] Atendente inválido. Tentando fallback para Admin...`);
+            // Wuzapi espera Phone como número limpo (sem @s.whatsapp.net)
+            let finalPhone;
+            if (check.valid && check.jid) {
+                finalPhone = check.jid.split('@')[0]; // extrai apenas os dígitos do JID
+            } else if (!check.valid && instance.notification_phone && selectedPhone !== instance.notification_phone) {
+                // Atendente inválido: tenta o admin como fallback
+                console.warn(`[HANDOVER-VAL] Atendente inválido. Tentando fallback para Admin (${instance.notification_phone})...`);
                 const adminCheck = await checkPhoneOnWhatsApp(instance.wuzapi_token, instance.notification_phone);
                 if (adminCheck.valid && adminCheck.jid) {
-                    finalJid = adminCheck.jid;
+                    finalPhone = adminCheck.jid.split('@')[0];
                 } else {
                     console.error(`[HANDOVER-VAL] Admin também inválido.`);
                     return false;
                 }
+            } else {
+                finalPhone = String(selectedPhone).replace(/[^0-9]/g, '');
             }
 
-            console.log(`[HANDOVER] Enviando notificação para JID: ${finalJid}`);
+            console.log(`[HANDOVER] Enviando notificação para ATENDENTE (Phone: ${finalPhone})...`);
 
-            const text = `🚨 *NOVO TRANSBORDO SOLICITADO* 🚨\n\n👤 *Lead:* ${pushName}\n📱 *Número:* ${remoteJid.split('@')[0]}\n\n📝 *Resumo da IA:*\n${summary}\n\n🔗 *Conversa:* https://wa.me/${remoteJid.split('@')[0]}`;
+            const text = `🚨 *NOVO TRANSBORDO SOLICITADO* 🚨\n\n👤 *Lead:* ${pushName}\n📱 *Número:* ${leadPhone}\n\n📝 *Resumo da IA:*\n${summary}\n\n🔗 *Conversa:* https://wa.me/${leadPhone}`;
 
             try {
-                await wuzCall('POST', '/chat/send/text', { Phone: finalJid, Body: text }, wuzapiHeaders);
+                const notifyRes = await wuzCall('POST', '/chat/send/text', { Phone: finalPhone, Body: text }, wuzapiHeaders);
+                console.log(`[HANDOVER] Notificação ao ATENDENTE: success=${notifyRes.data?.success}, id=${notifyRes.data?.data?.Id}, details=${notifyRes.data?.data?.Details}`);
+
+                if (notifyRes.data?.success === false) {
+                    console.error(`[HANDOVER-ERROR] Wuzapi rejeitou notificação ao atendente:`, JSON.stringify(notifyRes.data));
+                    return false;
+                }
 
                 // Update last_handover_at if it was a round-robin attendant
                 if (attendantId) {
                     await supabaseAdmin.from('attendants').update({ last_handover_at: new Date().toISOString() }).eq('id', attendantId);
+                    console.log(`[HANDOVER] last_handover_at atualizado para atendente ID: ${attendantId}`);
                 }
 
                 return true;
             } catch (notifyErr) {
-                console.error(`[HANDOVER-ERROR] Falha ao enviar notificação:`, notifyErr.message);
+                console.error(`[HANDOVER-ERROR] Exceção ao enviar notificação ao atendente:`, notifyErr.response?.data || notifyErr.message);
                 return false;
             }
         } else {
@@ -779,6 +804,7 @@ async function executeHandover(instance, remoteJid, pushName, messages, wuzapiHe
         return false;
     }
 }
+
 
 // GLOBAL WEBHOOK - Process Wuzapi Messages
 app.post('/api/webhook', async (req, res) => {
