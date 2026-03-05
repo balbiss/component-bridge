@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
     Link2, RefreshCw, Smartphone, XCircle, Plus, Loader2, QrCode,
-    Trash2, MessageCircle, Activity, Settings, Send, Bot, Users, Target, ClipboardList
+    Trash2, MessageCircle, Activity, Settings, Send, Bot, Users, Target, ClipboardList, FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
