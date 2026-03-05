@@ -1404,7 +1404,8 @@ app.post('/api/knowledge/upload', authenticateToken, upload.single('file'), asyn
         if (!instanceId) return res.status(400).json({ error: 'instanceId é obrigatório' });
 
         const file = req.file;
-        const fileName = file.originalname;
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const fileName = safeName;
         const filePath = `instance_${instanceId}/${Date.now()}_${fileName}`;
 
         // 1. Upload para o Supabase Storage
