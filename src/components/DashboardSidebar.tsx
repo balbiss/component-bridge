@@ -28,7 +28,6 @@ const mainItems: NavItem[] = [
   { icon: <Users className="w-4 h-4" />, label: "Contatos / CRM", href: "/dashboard/contatos" },
   { icon: <BarChart3 className="w-4 h-4" />, label: "Relatórios", href: "/dashboard/relatorios" },
   { icon: <Link2 className="w-4 h-4" />, label: "Canais / Conexões", href: "/dashboard/conexoes" },
-  { icon: <Zap className="w-4 h-4" />, label: "Automação", href: "/dashboard/automacao" },
 ];
 
 export function DashboardSidebar() {
