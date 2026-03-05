@@ -9,6 +9,9 @@ const os = require('os');
 const { processCampaigns } = require('./workers');
 const http = require('http');
 const https = require('https');
+const multer = require('multer');
+const pdf = require('pdf-parse');
+const { v4: uuidv4 } = require('uuid');
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -19,10 +22,19 @@ const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs'); // Added fs require
 const { OpenAI } = require('openai');
+const webpush = require('web-push');
 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
+
+// ── Web Push (VAPID) Setup ─────────────────────────────────────
+webpush.setVapidDetails(
+    process.env.VAPID_EMAIL || 'mailto:admin@inoovaweb.com.br',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+);
+
 // ──────────────────────────────────────────────────────────────
 // CLUSTER: spawn one worker per CPU core
 // ──────────────────────────────────────────────────────────────
@@ -231,12 +243,20 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false },
 });
 
+// Middleware para upload de arquivos em memória
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
 // Per-user client (respects RLS with user JWT)
-const getSupabaseForUser = (token) =>
-    createClient(supabaseUrl, supabaseKey, {
+function getSupabaseForUser(token) {
+    return createClient(supabaseUrl, supabaseKey, {
         auth: { persistSession: false, autoRefreshToken: false },
         global: { headers: { Authorization: `Bearer ${token}` } },
     });
+}
 
 // ──────────────────────────────────────────────────────────────
 // EXPRESS APP
@@ -1089,9 +1109,25 @@ app.post('/api/webhook', async (req, res) => {
             console.error(`[WEBHOOK] Exception ao buscar memória:`, e.message);
         }
 
+        // --- 7.5 SEARCH KNOWLEDGE BASE (RAG) ---
+        let knowledgeContext = "";
+        try {
+            console.log(`[KNOWLEDGE] Buscando contexto para query: "${userMessageContent.substring(0, 50)}..."`);
+            knowledgeContext = await getKnowledgeContext(instance.user_id, userMessageContent);
+            if (knowledgeContext) {
+                console.log(`[KNOWLEDGE] Contexto recuperado com sucesso para user ${instance.user_id}`);
+            }
+        } catch (e) {
+            console.error(`[KNOWLEDGE] Erro ao buscar contexto:`, e.message);
+        }
+
         const handoverInstruction = `\n\n[NOTA DO SISTEMA: Se o cliente expressar desejo de falar com suporte, atendente, humano ou se você não souber responder, responda apenas a palavra: [HANDOVER]]`;
+        const knowledgeInstruction = knowledgeContext
+            ? `\n\n[INFORMAÇÃO DA BASE DE CONHECIMENTO]:\n${knowledgeContext}\n\nUse a informação acima para responder o usuário prioritariamente se for relevante. Se a informação for insuficiente, use seu conhecimento geral.`
+            : "";
+
         const messages = [
-            { role: 'system', content: `${systemPrompt}\nNome do lead: ${pushName}${handoverInstruction}` },
+            { role: 'system', content: `${systemPrompt}\nNome do lead: ${pushName}${handoverInstruction}${knowledgeInstruction}` },
             ...chatContext,
             { role: 'user', content: userMessageContent }
         ];
@@ -1341,6 +1377,163 @@ app.post('/api/instances/:id/pair', authenticateToken, async (req, res) => {
         res.status(500).json({ error: 'Falha ao gerar código de pareamento', details: err.response?.data || err.message });
     }
 });
+
+// ──────────────────────────────────────────────────────────────
+// KNOWLEDGE BASE (PDF) — Upload, Process, Search
+// ──────────────────────────────────────────────────────────────
+
+// Helper: Gera embedding para um texto usando OpenAI
+async function generateEmbedding(text) {
+    const response = await openai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: text,
+    });
+    return response.data[0].embedding;
+}
+
+// POST /api/knowledge/upload — Recebe o PDF e inicia processamento
+app.post('/api/knowledge/upload', authenticateToken, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'Arquivo PDF não fornecido' });
+
+        const file = req.file;
+        const fileName = file.originalname;
+        const filePath = `user_${req.user.id}/${Date.now()}_${fileName}`;
+
+        // 1. Upload para o Supabase Storage
+        const { data: storageData, error: storageError } = await supabaseAdmin
+            .storage
+            .from('knowledge-docs')
+            .upload(filePath, file.buffer, {
+                contentType: 'application/pdf',
+                upsert: true
+            });
+
+        if (storageError) throw storageError;
+
+        // 2. Registrar no banco de dados
+        const { data: docData, error: dbError } = await supabaseAdmin
+            .from('knowledge_documents')
+            .insert([{
+                user_id: req.user.id,
+                file_name: fileName,
+                file_path: filePath,
+                file_size: file.size,
+                file_type: 'pdf',
+                status: 'processing'
+            }])
+            .select()
+            .single();
+
+        if (dbError) throw dbError;
+
+        // 3. Processar em background (extração -> chunks -> embeddings)
+        processPdfDocument(docData, file.buffer).catch(err => {
+            console.error('[KNOWLEDGE] Erro no processamento em background:', err.message);
+            supabaseAdmin.from('knowledge_documents').update({ status: 'error' }).eq('id', docData.id);
+        });
+
+        res.json({ success: true, document: docData });
+    } catch (err) {
+        console.error('[KNOWLEDGE] Erro no upload:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /api/knowledge/:id — Remove documento e chunks
+app.delete('/api/knowledge/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { data: doc, error: fetchErr } = await supabaseAdmin
+            .from('knowledge_documents')
+            .select('*')
+            .eq('id', id)
+            .eq('user_id', req.user.id)
+            .single();
+
+        if (fetchErr || !doc) return res.status(404).json({ error: 'Documento não encontrado' });
+
+        // Deleta do storage
+        await supabaseAdmin.storage.from('knowledge-docs').remove([doc.file_path]);
+
+        // Deleta chunks (cascata) e o documento
+        await supabaseAdmin.from('knowledge_chunks').delete().eq('document_id', id);
+        await supabaseAdmin.from('knowledge_documents').delete().eq('id', id);
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Lógica de Processamento de PDF (Extração -> Chunks -> Embeddings)
+async function processPdfDocument(doc, buffer) {
+    try {
+        const data = await pdf(buffer);
+        const text = data.text.trim();
+        if (!text) throw new Error('PDF vazio ou sem texto extraível');
+
+        // Divisão em chunks (aprox 1000 caracteres com overlap)
+        const chunkSize = 1000;
+        const overlap = 200;
+        const chunks = [];
+
+        for (let i = 0; i < text.length; i += (chunkSize - overlap)) {
+            chunks.push(text.substring(i, i + chunkSize));
+            if (i + chunkSize >= text.length) break;
+        }
+
+        console.log(`[KNOWLEDGE] Documento ${doc.id} dividido em ${chunks.length} chunks.`);
+
+        // Gerar embeddings e salvar chunks
+        for (let i = 0; i < chunks.length; i++) {
+            const content = chunks[i];
+            const embedding = await generateEmbedding(content);
+
+            await supabaseAdmin.from('knowledge_chunks').insert({
+                document_id: doc.id,
+                user_id: doc.user_id,
+                content: content,
+                chunk_index: i,
+                embedding: embedding
+            });
+        }
+
+        // Finalizar status
+        await supabaseAdmin.from('knowledge_documents').update({ status: 'completed' }).eq('id', doc.id);
+        console.log(`[KNOWLEDGE] Documento ${doc.id} processado com sucesso.`);
+    } catch (err) {
+        console.error(`[KNOWLEDGE] Erro ao processar documento ${doc.id}:`, err.message);
+        await supabaseAdmin.from('knowledge_documents').update({ status: 'error' }).eq('id', doc.id);
+    }
+}
+
+// ──────────────────────────────────────────────────────────────
+// Helper: Busca Contexto na Base de Conhecimento
+// ──────────────────────────────────────────────────────────────
+async function getKnowledgeContext(userId, query) {
+    try {
+        const embedding = await generateEmbedding(query);
+        const { data, error } = await supabaseAdmin.rpc('match_knowledge_chunks', {
+            query_embedding: embedding,
+            match_threshold: 0.5,
+            match_count: 3,
+            p_user_id: userId
+        });
+
+        if (error) {
+            console.error('[KNOWLEDGE] Erro RPC match_chunks:', error.message);
+            return "";
+        }
+
+        if (!data || data.length === 0) return "";
+
+        return data.map(chunk => chunk.content).join("\n\n---\n\n");
+    } catch (err) {
+        console.error('[KNOWLEDGE] Erro ao buscar contexto:', err.message);
+        return "";
+    }
+}
 
 // ──────────────────────────────────────────────────────────────
 // AVATAR
@@ -1668,7 +1861,97 @@ app.delete('/api/campaigns/:id', authenticateToken, async (req, res) => {
 // (Duplicate removed)
 
 // ──────────────────────────────────────────────────────────────
+// BROWSER PUSH NOTIFICATIONS
+// ──────────────────────────────────────────────────────────────
+
+// Helper: envia push para todos os subscribers de uma instância
+async function sendPushToAll(instanceId, title, body, url) {
+    try {
+        const { data: subs, error } = await supabaseAdmin
+            .from('push_subscriptions')
+            .select('*')
+            .eq('instance_id', instanceId);
+
+        if (error || !subs || subs.length === 0) {
+            console.log(`[PUSH] Nenhum subscriber encontrado para instância ${instanceId}`);
+            return;
+        }
+
+        console.log(`[PUSH] Enviando notificação para ${subs.length} subscriber(s)...`);
+        const payload = JSON.stringify({ title, body, url });
+
+        const results = await Promise.allSettled(
+            subs.map(async (sub) => {
+                const pushSub = { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } };
+                await webpush.sendNotification(pushSub, payload);
+            })
+        );
+
+        const failed = results.filter(r => r.status === 'rejected');
+        if (failed.length > 0) {
+            console.warn(`[PUSH] ${failed.length} notificação(ões) falharam. Removendo subscriptions inválidas...`);
+            // Remove subscriptions inválidas (GoneError = 410)
+            for (let i = 0; i < results.length; i++) {
+                if (results[i].status === 'rejected' && results[i].reason?.statusCode === 410) {
+                    await supabaseAdmin.from('push_subscriptions').delete().eq('endpoint', subs[i].endpoint);
+                }
+            }
+        }
+        console.log(`[PUSH] ${results.length - failed.length}/${results.length} notificações enviadas com sucesso.`);
+    } catch (err) {
+        console.error('[PUSH] Erro ao enviar push:', err.message);
+    }
+}
+
+// GET /api/push/vapid-key — retorna a public key para o frontend
+app.get('/api/push/vapid-key', (req, res) => {
+    res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+});
+
+// POST /api/push/subscribe — salva subscription do browser
+app.post('/api/push/subscribe', authenticateUser, async (req, res) => {
+    try {
+        const { subscription, instanceId } = req.body;
+        if (!subscription?.endpoint || !instanceId) {
+            return res.status(400).json({ error: 'subscription e instanceId são obrigatórios' });
+        }
+
+        const { error } = await supabaseAdmin.from('push_subscriptions').upsert({
+            instance_id: instanceId,
+            user_id: req.user.id,
+            endpoint: subscription.endpoint,
+            p256dh: subscription.keys.p256dh,
+            auth: subscription.keys.auth
+        }, { onConflict: 'endpoint' });
+
+        if (error) {
+            console.error('[PUSH] Erro ao salvar subscription:', error.message);
+            return res.status(500).json({ error: 'Falha ao salvar subscription' });
+        }
+
+        console.log(`[PUSH] Subscription salva para user ${req.user.id}, instância ${instanceId}`);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /api/push/subscribe — remove subscription
+app.delete('/api/push/subscribe', authenticateUser, async (req, res) => {
+    try {
+        const { endpoint } = req.body;
+        if (!endpoint) return res.status(400).json({ error: 'endpoint obrigatório' });
+
+        await supabaseAdmin.from('push_subscriptions').delete().eq('endpoint', endpoint).eq('user_id', req.user.id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ──────────────────────────────────────────────────────────────
 // GLOBAL ERROR HANDLER
+
 // ──────────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
     console.error('[ERROR]', err.message);

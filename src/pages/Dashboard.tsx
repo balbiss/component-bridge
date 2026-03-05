@@ -16,7 +16,8 @@ import {
   X,
   TrendingUp,
   Search,
-  ChevronDown
+  ChevronDown,
+  Book
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -37,6 +38,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Canais from "@/components/Canais";
 import CampaignHistory from "@/components/CampaignHistory";
 import MassDispatch from "@/components/MassDispatch";
+import KnowledgeBase from "./KnowledgeBase";
 
 interface NavItem {
   icon: React.ReactNode;
@@ -94,6 +96,7 @@ const Dashboard = () => {
     { icon: <LayoutDashboard className="w-4 h-4" />, label: "Dashboard", href: "dashboard" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Atendimento", href: "atendimento", badge: 12 },
     { icon: <Bot className="w-4 h-4" />, label: "Agentes/IA", href: "agentes" },
+    { icon: <Book className="w-4 h-4" />, label: "Conhecimento (PDF)", href: "knowledge" },
     { icon: <Users className="w-4 h-4" />, label: "Contatos / CRM", href: "contatos" },
     { icon: <BarChart3 className="w-4 h-4" />, label: "Relatórios", href: "relatorios" },
     { icon: <Link2 className="w-4 h-4" />, label: "Canais / Conexões", href: "conexoes" },
@@ -267,6 +270,8 @@ const Dashboard = () => {
             <MassDispatch onClose={() => setActiveItem("dashboard")} instance={null} />
           ) : activeItem === "conexoes" ? (
             <Canais />
+          ) : activeItem === "knowledge" ? (
+            <KnowledgeBase />
           ) : (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4">
               <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center">

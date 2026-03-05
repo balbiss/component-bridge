@@ -8,6 +8,7 @@ import {
   Link2,
   MessageSquare,
   Zap,
+  Book
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ const mainItems: NavItem[] = [
   { icon: <MessageSquare className="w-4 h-4" />, label: "Atendimentos", href: "/dashboard/atendimentos", badge: 12 },
   { icon: <Bot className="w-4 h-4" />, label: "Agentes/IA", href: "/dashboard/agentes" },
   { icon: <Users className="w-4 h-4" />, label: "Contatos / CRM", href: "/dashboard/contatos" },
+  { icon: <Book className="w-4 h-4" />, label: "Base de Conhecimento (PDF)", href: "/dashboard/knowledge" },
   { icon: <BarChart3 className="w-4 h-4" />, label: "Relatórios", href: "/dashboard/relatorios" },
   { icon: <Link2 className="w-4 h-4" />, label: "Canais / Conexões", href: "/dashboard/conexoes" },
 ];
