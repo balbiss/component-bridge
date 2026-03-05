@@ -29,11 +29,16 @@ const openai = new OpenAI({
 });
 
 // ── Web Push (VAPID) Setup ─────────────────────────────────────
-webpush.setVapidDetails(
-    process.env.VAPID_EMAIL || 'mailto:admin@inoovaweb.com.br',
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-);
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+        process.env.VAPID_EMAIL || 'mailto:admin@inoovaweb.com.br',
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+    console.log('[PUSH] Web-push configurado com sucesso.');
+} else {
+    console.warn('[PUSH] Chaves VAPID (PUBLIC/PRIVATE) ausentes. Notificações Push desativadas.');
+}
 
 // ──────────────────────────────────────────────────────────────
 // CLUSTER: spawn one worker per CPU core
