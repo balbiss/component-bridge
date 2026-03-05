@@ -1918,7 +1918,7 @@ app.get('/api/push/vapid-key', (req, res) => {
 });
 
 // POST /api/push/subscribe — salva subscription do browser
-app.post('/api/push/subscribe', authenticateUser, async (req, res) => {
+app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
     try {
         const { subscription, instanceId } = req.body;
         if (!subscription?.endpoint || !instanceId) {
@@ -1946,7 +1946,7 @@ app.post('/api/push/subscribe', authenticateUser, async (req, res) => {
 });
 
 // DELETE /api/push/subscribe — remove subscription
-app.delete('/api/push/subscribe', authenticateUser, async (req, res) => {
+app.delete('/api/push/subscribe', authenticateToken, async (req, res) => {
     try {
         const { endpoint } = req.body;
         if (!endpoint) return res.status(400).json({ error: 'endpoint obrigatório' });
