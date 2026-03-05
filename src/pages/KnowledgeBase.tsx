@@ -26,7 +26,11 @@ interface KnowledgeDocument {
     created_at: string;
 }
 
-const KnowledgeBase = () => {
+interface KnowledgeBaseProps {
+    instanceId?: string;
+}
+
+const KnowledgeBase = ({ instanceId }: KnowledgeBaseProps) => {
     const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -34,10 +38,16 @@ const KnowledgeBase = () => {
 
     const fetchDocuments = async () => {
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('knowledge_documents')
                 .select('*')
                 .order('created_at', { ascending: false });
+
+            if (instanceId) {
+                query = query.eq('instance_id', instanceId);
+            }
+
+            const { data, error } = await query;
 
             if (error) throw error;
             setDocuments(data || []);
@@ -71,6 +81,9 @@ const KnowledgeBase = () => {
         setUploading(true);
         const formData = new FormData();
         formData.append('file', file);
+        if (instanceId) {
+            formData.append('instanceId', instanceId);
+        }
 
         try {
             const headers = await getAuthHeader();

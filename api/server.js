@@ -1112,10 +1112,10 @@ app.post('/api/webhook', async (req, res) => {
         // --- 7.5 SEARCH KNOWLEDGE BASE (RAG) ---
         let knowledgeContext = "";
         try {
-            console.log(`[KNOWLEDGE] Buscando contexto para query: "${userMessageContent.substring(0, 50)}..."`);
-            knowledgeContext = await getKnowledgeContext(instance.user_id, userMessageContent);
+            console.log(`[KNOWLEDGE] Buscando contexto para query: "${userMessageContent.substring(0, 50)}..." na instância ${instance.id}`);
+            knowledgeContext = await getKnowledgeContext(instance.id, userMessageContent);
             if (knowledgeContext) {
-                console.log(`[KNOWLEDGE] Contexto recuperado com sucesso para user ${instance.user_id}`);
+                console.log(`[KNOWLEDGE] Contexto recuperado com sucesso para instância ${instance.id}`);
             }
         } catch (e) {
             console.error(`[KNOWLEDGE] Erro ao buscar contexto:`, e.message);
@@ -1394,11 +1394,13 @@ async function generateEmbedding(text) {
 // POST /api/knowledge/upload — Recebe o PDF e inicia processamento
 app.post('/api/knowledge/upload', authenticateToken, upload.single('file'), async (req, res) => {
     try {
+        const { instanceId } = req.body;
         if (!req.file) return res.status(400).json({ error: 'Arquivo PDF não fornecido' });
+        if (!instanceId) return res.status(400).json({ error: 'instanceId é obrigatório' });
 
         const file = req.file;
         const fileName = file.originalname;
-        const filePath = `user_${req.user.id}/${Date.now()}_${fileName}`;
+        const filePath = `instance_${instanceId}/${Date.now()}_${fileName}`;
 
         // 1. Upload para o Supabase Storage
         const { data: storageData, error: storageError } = await supabaseAdmin
@@ -1416,6 +1418,7 @@ app.post('/api/knowledge/upload', authenticateToken, upload.single('file'), asyn
             .from('knowledge_documents')
             .insert([{
                 user_id: req.user.id,
+                instance_id: instanceId,
                 file_name: fileName,
                 file_path: filePath,
                 file_size: file.size,
@@ -1428,7 +1431,7 @@ app.post('/api/knowledge/upload', authenticateToken, upload.single('file'), asyn
         if (dbError) throw dbError;
 
         // 3. Processar em background (extração -> chunks -> embeddings)
-        processPdfDocument(docData, file.buffer).catch(err => {
+        processPdfDocument(docData, file.buffer, instanceId).catch(err => {
             console.error('[KNOWLEDGE] Erro no processamento em background:', err.message);
             supabaseAdmin.from('knowledge_documents').update({ status: 'error' }).eq('id', docData.id);
         });
@@ -1467,7 +1470,7 @@ app.delete('/api/knowledge/:id', authenticateToken, async (req, res) => {
 });
 
 // Lógica de Processamento de PDF (Extração -> Chunks -> Embeddings)
-async function processPdfDocument(doc, buffer) {
+async function processPdfDocument(doc, buffer, instanceId) {
     try {
         const data = await pdf(buffer);
         const text = data.text.trim();
@@ -1493,6 +1496,7 @@ async function processPdfDocument(doc, buffer) {
             await supabaseAdmin.from('knowledge_chunks').insert({
                 document_id: doc.id,
                 user_id: doc.user_id,
+                instance_id: instanceId,
                 content: content,
                 chunk_index: i,
                 embedding: embedding
@@ -1511,14 +1515,14 @@ async function processPdfDocument(doc, buffer) {
 // ──────────────────────────────────────────────────────────────
 // Helper: Busca Contexto na Base de Conhecimento
 // ──────────────────────────────────────────────────────────────
-async function getKnowledgeContext(userId, query) {
+async function getKnowledgeContext(instanceId, query) {
     try {
         const embedding = await generateEmbedding(query);
         const { data, error } = await supabaseAdmin.rpc('match_knowledge_chunks', {
             query_embedding: embedding,
             match_threshold: 0.5,
             match_count: 3,
-            p_user_id: userId
+            p_instance_id: instanceId
         });
 
         if (error) {
@@ -1957,6 +1961,20 @@ app.use((err, _req, res, _next) => {
     console.error('[ERROR]', err.message);
     res.status(500).json({ error: 'Erro interno do servidor', details: err.message });
 });
+
+// ──────────────────────────────────────────────────────────────
+// SERVE STATIC FILES (Frontend)
+// ──────────────────────────────────────────────────────────────
+const distPath = path.join(__dirname, '../dist');
+if (fs.existsSync(distPath)) {
+    console.log(`[SERVER] Servindo frontend estático de: ${distPath}`);
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+        if (!req.path.startsWith('/api/')) {
+            res.sendFile(path.join(distPath, 'index.html'));
+        }
+    });
+}
 
 // ──────────────────────────────────────────────────────────────
 // START

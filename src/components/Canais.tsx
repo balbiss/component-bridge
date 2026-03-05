@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { MassDispatch } from "./MassDispatch";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import KnowledgeBase from "../pages/KnowledgeBase";
 
 const API = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "http://localhost:3003/api";
 
@@ -61,6 +62,8 @@ const Canais = () => {
     const [handoverLeads, setHandoverLeads] = useState<any[]>([]);
     const [loadingLeads, setLoadingLeads] = useState(false);
     const [editingLeadsInstance, setEditingLeadsInstance] = useState<any | null>(null);
+    const [showKnowledgeModal, setShowKnowledgeModal] = useState(false);
+    const [editingKnowledgeInstance, setEditingKnowledgeInstance] = useState<any | null>(null);
 
     // ── Buscar instâncias ──────────────────────────────────────
     const fetchInstances = useCallback(async () => {
@@ -365,6 +368,11 @@ const Canais = () => {
         }
     };
 
+    const openKnowledgeModal = (instance: any) => {
+        setEditingKnowledgeInstance(instance);
+        setShowKnowledgeModal(true);
+    };
+
     // ── Loading screen ─────────────────────────────────────────
     if (loading) {
         return (
@@ -429,6 +437,7 @@ const Canais = () => {
                         onResetMemory={resetAIMemory}
                         onOpenHandover={openHandoverModal}
                         onOpenLeads={openLeadsModal}
+                        onOpenKnowledge={openKnowledgeModal}
                     />
                 ))}
             </div>
@@ -789,6 +798,7 @@ const Canais = () => {
             )}
             {/* Modal: Leads em Atendimento */}
             {showLeadsModal && editingLeadsInstance && (
+                // ... Existing Leads Modal code ...
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden border border-orange-100 flex flex-col max-h-[80vh]">
                         {/* Header */}
@@ -797,7 +807,7 @@ const Canais = () => {
                                 <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
                                     <Target className="w-6 h-6" />
                                 </div>
-                                <div>
+                                <div className="flex flex-col">
                                     <h3 className="text-xl font-bold">Leads em Atendimento</h3>
                                     <p className="text-orange-100 text-xs mt-0.5">IA pausada para estes contatos ({editingLeadsInstance.name})</p>
                                 </div>
@@ -827,7 +837,7 @@ const Canais = () => {
                                                     <Smartphone className="w-5 h-5" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-bold text-gray-800">{lead.remote_jid}</p>
+                                                    <p className="text-sm font-bold text-gray-800">{lead.remote_jid.split('@')[0]}</p>
                                                     <p className="text-[10px] text-gray-500 flex items-center gap-1">
                                                         <Activity className="w-3 h-3" />
                                                         Pausado em: {new Date(lead.created_at).toLocaleString()}
@@ -855,6 +865,38 @@ const Canais = () => {
                     </div>
                 </div>
             )}
+
+            {/* Modal: Base de Conhecimento (PDF) */}
+            {showKnowledgeModal && editingKnowledgeInstance && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden border border-purple-100 flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
+                                    <FileText className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-bold">Base de Conhecimento (PDF)</h3>
+                                    <p className="text-purple-100 text-xs mt-0.5">Treine o Agente IA da instância: {editingKnowledgeInstance.name}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowKnowledgeModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                <XCircle className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto">
+                            <KnowledgeBase instanceId={editingKnowledgeInstance.id} />
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
+                            <p className="text-[10px] text-gray-400 font-medium">Os arquivos carregados aqui serão usados exclusivamente por esta instância via RAG (Retrieval-Augmented Generation).</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -873,6 +915,7 @@ interface InstanceCardProps {
     onResetMemory: (id: string) => void;
     onOpenHandover: (instance: any) => void;
     onOpenLeads: (instance: any) => void;
+    onOpenKnowledge: (instance: any) => void;
 }
 
 const InstanceCard = ({
@@ -887,7 +930,8 @@ const InstanceCard = ({
     onEditAI,
     onResetMemory,
     onOpenHandover,
-    onOpenLeads
+    onOpenLeads,
+    onOpenKnowledge
 }: InstanceCardProps) => {
     const [showMenu, setShowMenu] = useState(false);
     const [showAIMenu, setShowAIMenu] = useState(false);
@@ -934,7 +978,15 @@ const InstanceCard = ({
                 setShowAIMenu(false);
             }
         },
-        { label: "Base de Conhecimento (PDF)", emoji: "📚" },
+        {
+            label: "Base de Conhecimento (PDF)",
+            emoji: "📚",
+            action: () => {
+                onOpenKnowledge(instance);
+                setShowAIMenu(false);
+                setShowMenu(false);
+            }
+        },
         { label: "Tempo de Reativação", emoji: "🕓" },
         { label: "Follow-ups", emoji: "🔔" },
     ];
