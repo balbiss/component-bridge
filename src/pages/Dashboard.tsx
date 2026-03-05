@@ -97,7 +97,6 @@ const Dashboard = () => {
     { icon: <Users className="w-4 h-4" />, label: "Contatos / CRM", href: "contatos" },
     { icon: <BarChart3 className="w-4 h-4" />, label: "Relatórios", href: "relatorios" },
     { icon: <Link2 className="w-4 h-4" />, label: "Canais / Conexões", href: "conexoes" },
-    { icon: <Zap className="w-4 h-4" />, label: "Campanhas", href: "automacao" },
   ];
 
   return (
@@ -265,7 +264,7 @@ const Dashboard = () => {
               </div>
             </>
           ) : activeItem === "automacao" ? (
-            <MassDispatch onBack={() => setActiveItem("dashboard")} />
+            <MassDispatch onClose={() => setActiveItem("dashboard")} instance={null} />
           ) : activeItem === "conexoes" ? (
             <Canais />
           ) : (
