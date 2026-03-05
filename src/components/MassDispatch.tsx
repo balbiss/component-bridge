@@ -6,13 +6,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { supabase } from '@/lib/supabase';
 
-const API = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:3003/api';
-
-async function getAuthHeader() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.');
-    return { Authorization: `Bearer ${session.access_token}` };
-}
+import { API, getAuthHeader } from '@/lib/api';
 
 // ── Tipos ──────────────────────────────────────────────────────
 type MediaType = 'text' | 'image' | 'video' | 'audio' | 'document';

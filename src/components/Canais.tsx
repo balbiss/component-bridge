@@ -14,14 +14,9 @@ import { MassDispatch } from "./MassDispatch";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import KnowledgeBase from "../pages/KnowledgeBase";
+import { API, getAuthHeader } from "@/lib/api";
 
-const API = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "http://localhost:3003/api";
 
-async function getAuthHeader() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) throw new Error("Sessão expirada. Faça login novamente.");
-    return { Authorization: `Bearer ${session.access_token}` };
-}
 
 // ────────────────────────────────────────────────────────────────
 const Canais = () => {
