@@ -146,68 +146,97 @@ const KnowledgeBase = ({ instanceId }: KnowledgeBaseProps) => {
     );
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Base de Conhecimento (PDF)</h2>
-                    <p className="text-sm text-gray-500 mt-1">Carregue documentos para treinar o cérebro dos seus Agentes de IA.</p>
+        <div className={`space-y-6 ${!instanceId ? 'animate-in fade-in duration-500' : ''}`}>
+            {/* Header - Only show if not in a specific instance context (e.g. main page) */}
+            {!instanceId && (
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Base de Conhecimento (PDF)</h2>
+                        <p className="text-sm text-gray-500 mt-1">Carregue documentos para treinar o cérebro dos seus Agentes de IA.</p>
+                    </div>
+                    <div className="relative">
+                        <Input
+                            type="file"
+                            accept=".pdf"
+                            onChange={handleFileUpload}
+                            disabled={uploading}
+                            className="hidden"
+                            id="pdf-upload"
+                        />
+                        <label htmlFor="pdf-upload">
+                            <Button asChild disabled={uploading} className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-900/20 cursor-pointer">
+                                <span>
+                                    {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FilePlus className="w-4 h-4 mr-2" />}
+                                    {uploading ? 'Enviando...' : 'Adicionar PDF'}
+                                </span>
+                            </Button>
+                        </label>
+                    </div>
                 </div>
-                <div className="relative">
-                    <Input
-                        type="file"
-                        accept=".pdf"
-                        onChange={handleFileUpload}
-                        disabled={uploading}
-                        className="hidden"
-                        id="pdf-upload"
-                    />
-                    <label htmlFor="pdf-upload">
-                        <Button asChild disabled={uploading} className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-900/20 cursor-pointer">
-                            <span>
-                                {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FilePlus className="w-4 h-4 mr-2" />}
-                                {uploading ? 'Enviando...' : 'Adicionar PDF'}
-                            </span>
-                        </Button>
-                    </label>
-                </div>
-            </div>
+            )}
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-                        <FileText className="w-6 h-6" />
+            {/* Stats Cards - Only show on main page */}
+            {!instanceId && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
+                            <FileText className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-medium text-gray-500">Total de Documentos</p>
+                            <p className="text-xl font-bold text-gray-900">{documents.length}</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-xs font-medium text-gray-500">Total de Documentos</p>
-                        <p className="text-xl font-bold text-gray-900">{documents.length}</p>
+                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                            <CheckCircle2 className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-medium text-gray-500">Processados com Sucesso</p>
+                            <p className="text-xl font-bold text-gray-900">{documents.filter(d => d.status === 'completed').length}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                            <FileCode className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-medium text-gray-500">Busca Semântica Ativa</p>
+                            <p className="text-sm font-bold text-amber-600 pt-1">Pronto para RAG ⚡</p>
+                        </div>
                     </div>
                 </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                        <CheckCircle2 className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <p className="text-xs font-medium text-gray-500">Processados com Sucesso</p>
-                        <p className="text-xl font-bold text-gray-900">{documents.filter(d => d.status === 'completed').length}</p>
-                    </div>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-                        <FileCode className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <p className="text-xs font-medium text-gray-500">Busca Semântica Ativa</p>
-                        <p className="text-sm font-bold text-amber-600 pt-1">Pronto para RAG ⚡</p>
-                    </div>
-                </div>
-            </div>
+            )}
 
             {/* Main Content */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="p-5 border-b border-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <h3 className="text-base font-bold text-gray-900">Documentos da Base</h3>
+                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-between">
+                        <h3 className="text-base font-bold text-gray-900 whitespace-nowrap">Documentos da Base</h3>
+
+                        {/* Internal Upload for Modal view */}
+                        {instanceId && (
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    type="file"
+                                    accept=".pdf"
+                                    onChange={handleFileUpload}
+                                    disabled={uploading}
+                                    className="hidden"
+                                    id="pdf-upload-modal"
+                                />
+                                <label htmlFor="pdf-upload-modal">
+                                    <Button asChild size="sm" disabled={uploading} className="bg-purple-600 hover:bg-purple-700 text-white cursor-pointer h-9 px-4 rounded-xl">
+                                        <span>
+                                            {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FilePlus className="w-4 h-4 mr-2" />}
+                                            {uploading ? 'Enviando...' : 'Adicionar PDF'}
+                                        </span>
+                                    </Button>
+                                </label>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="relative w-full sm:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <Input

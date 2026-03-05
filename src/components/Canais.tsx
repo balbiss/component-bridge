@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import KnowledgeBase from "../pages/KnowledgeBase";
 import { API, getAuthHeader } from "@/lib/api";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 
 
@@ -39,6 +40,7 @@ const Canais = () => {
     const [tempDelayMin, setTempDelayMin] = useState(2000);
     const [tempDelayMax, setTempDelayMax] = useState(5000);
     const [savingAI, setSavingAI] = useState(false);
+    const [activeAITab, setActiveAITab] = useState("behavior");
 
     // --- HUMAN HANDOVER & RODIZIO STATES ---
     const [showHandoverModal, setShowHandoverModal] = useState(false);
@@ -248,11 +250,12 @@ const Canais = () => {
     };
 
     // ── Abrir Modal de Edição de IA ──────────────────────────────
-    const openAIModal = (instance: any) => {
+    const openAIModal = (instance: any, tab = "behavior") => {
         setEditingAIInstance(instance);
         setTempPrompt(instance.system_prompt || "");
         setTempDelayMin(instance.ai_delay_min || 2000);
         setTempDelayMax(instance.ai_delay_max || 5000);
+        setActiveAITab(tab);
         setShowPromptModal(true);
     };
 
@@ -364,8 +367,7 @@ const Canais = () => {
     };
 
     const openKnowledgeModal = (instance: any) => {
-        setEditingKnowledgeInstance(instance);
-        setShowKnowledgeModal(true);
+        openAIModal(instance, "knowledge");
     };
 
     // ── Loading screen ─────────────────────────────────────────
@@ -462,7 +464,7 @@ const Canais = () => {
             {/* Modal: QR Code */}
             {/* Existing QR Modal content... */}
 
-            {/* Modal: Editar AI Prompt */}
+            {/* Modal: Agente IA (Configuração + Base de Conhecimento) */}
             {showPromptModal && editingAIInstance && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
                     <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-purple-100 flex flex-col max-h-[90vh]">
@@ -473,8 +475,8 @@ const Canais = () => {
                                     <Bot className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold">Personalizar Agente IA</h3>
-                                    <p className="text-purple-100 text-xs mt-0.5">Defina como a IA deve se comportar para: {editingAIInstance.name}</p>
+                                    <h3 className="text-xl font-bold">Configurar Agente IA</h3>
+                                    <p className="text-purple-100 text-xs mt-0.5">{editingAIInstance.name}</p>
                                 </div>
                             </div>
                             <button onClick={() => setShowPromptModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
@@ -482,84 +484,115 @@ const Canais = () => {
                             </button>
                         </div>
 
-                        <div className="p-6 overflow-y-auto space-y-6">
-                            {/* System Prompt Section */}
-                            <div className="space-y-3">
-                                <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-                                    <ClipboardList className="w-4 h-4 text-purple-600" />
-                                    System Prompt (O Cérebro do Agente)
-                                </label>
-                                <div className="relative group">
-                                    <textarea
-                                        value={tempPrompt}
-                                        onChange={(e) => setTempPrompt(e.target.value)}
-                                        placeholder="Ex: Você é o suporte da empresa X, seja educado e tente agendar uma reunião..."
-                                        className="w-full min-h-[180px] p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none text-sm text-gray-700 leading-relaxed resize-none"
-                                    />
-                                    <div className="absolute top-4 right-4 text-[10px] font-bold text-gray-400 bg-white px-2 py-1 rounded-md border border-gray-100 uppercase tracking-wider">Instruções</div>
-                                </div>
-                                <p className="text-[11px] text-gray-400 flex items-start gap-1.5 px-1 leading-normal">
-                                    <Settings className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                                    Dica: Especifique o tom de voz, o nome da empresa e os objetivos principais da conversa aqui.
-                                </p>
+                        <Tabs value={activeAITab} onValueChange={setActiveAITab} className="flex-1 flex flex-col overflow-hidden">
+                            <div className="px-6 pt-4 bg-gray-50/50 border-b border-gray-100">
+                                <TabsList className="grid w-full grid-cols-2 bg-gray-100/50 p-1 rounded-xl">
+                                    <TabsTrigger value="behavior" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all">
+                                        🤖 Comportamento
+                                    </TabsTrigger>
+                                    <TabsTrigger value="knowledge" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all">
+                                        📚 Conhecimento (RAG)
+                                    </TabsTrigger>
+                                </TabsList>
                             </div>
 
-                            {/* Delay Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                                <div className="space-y-2.5">
-                                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wide px-1">Delay Mínimo (ms)</label>
-                                    <div className="relative group">
-                                        <Input
-                                            type="number"
-                                            value={tempDelayMin}
-                                            onChange={(e) => setTempDelayMin(parseInt(e.target.value))}
-                                            className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:border-purple-500 transition-all font-mono"
-                                        />
-                                        <div className="absolute right-3 top-3.5 text-[10px] font-bold text-gray-400 uppercase">ms</div>
+                            <div className="flex-1 overflow-y-auto p-6">
+                                <TabsContent value="behavior" className="mt-0 space-y-6 animate-in slide-in-from-left-2 duration-300">
+                                    {/* System Prompt Section */}
+                                    <div className="space-y-3">
+                                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                                            <ClipboardList className="w-4 h-4 text-purple-600" />
+                                            System Prompt (O Cérebro do Agente)
+                                        </label>
+                                        <div className="relative group">
+                                            <textarea
+                                                value={tempPrompt}
+                                                onChange={(e) => setTempPrompt(e.target.value)}
+                                                placeholder="Ex: Você é o suporte da empresa X, seja educado e tente agendar uma reunião..."
+                                                className="w-full min-h-[180px] p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all outline-none text-sm text-gray-700 leading-relaxed resize-none"
+                                            />
+                                            <div className="absolute top-4 right-4 text-[10px] font-bold text-gray-400 bg-white px-2 py-1 rounded-md border border-gray-100 uppercase tracking-wider">Instruções</div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="space-y-2.5">
-                                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wide px-1">Delay Máximo (ms)</label>
-                                    <div className="relative group">
-                                        <Input
-                                            type="number"
-                                            value={tempDelayMax}
-                                            onChange={(e) => setTempDelayMax(parseInt(e.target.value))}
-                                            className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:border-purple-500 transition-all font-mono"
-                                        />
-                                        <div className="absolute right-3 top-3.5 text-[10px] font-bold text-gray-400 uppercase">ms</div>
+
+                                    {/* Delay Grid */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2.5">
+                                            <label className="text-xs font-bold text-gray-600 uppercase tracking-wide px-1">Delay Mínimo (ms)</label>
+                                            <div className="relative group">
+                                                <Input
+                                                    type="number"
+                                                    value={tempDelayMin}
+                                                    onChange={(e) => setTempDelayMin(parseInt(e.target.value))}
+                                                    className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:border-purple-500 transition-all"
+                                                />
+                                                <div className="absolute right-3 top-3.5 text-[10px] font-bold text-gray-400 uppercase">ms</div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2.5">
+                                            <label className="text-xs font-bold text-gray-600 uppercase tracking-wide px-1">Delay Máximo (ms)</label>
+                                            <div className="relative group">
+                                                <Input
+                                                    type="number"
+                                                    value={tempDelayMax}
+                                                    onChange={(e) => setTempDelayMax(parseInt(e.target.value))}
+                                                    className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:border-purple-500 transition-all"
+                                                />
+                                                <div className="absolute right-3 top-3.5 text-[10px] font-bold text-gray-400 uppercase">ms</div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
 
-                            <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50 flex items-start gap-3">
-                                <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600">
-                                    <Activity className="w-4 h-4" />
-                                </div>
-                                <div>
-                                    <h4 className="text-xs font-bold text-blue-800">Humanização Ativa</h4>
-                                    <p className="text-[11px] text-blue-600/80 mt-0.5">A IA vai escolher um tempo aleatório entre o mínimo e o máximo para responder, simulando o tempo de leitura real.</p>
-                                </div>
-                            </div>
-                        </div>
+                                    <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50 flex items-start gap-3">
+                                        <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600">
+                                            <Activity className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-bold text-blue-800">Humanização Ativa</h4>
+                                            <p className="text-[11px] text-blue-600/80 mt-0.5">A IA vai escolher um tempo aleatório entre o mínimo e o máximo para responder.</p>
+                                        </div>
+                                    </div>
+                                </TabsContent>
 
-                        {/* Footer */}
-                        <div className="p-6 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-3">
-                            <Button
-                                variant="ghost"
-                                onClick={() => setShowPromptModal(false)}
-                                className="rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors"
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                onClick={updateAIConfig}
-                                disabled={savingAI}
-                                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold h-12 px-8 rounded-xl shadow-xl shadow-purple-200 min-w-[140px]"
-                            >
-                                {savingAI ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar Agente"}
-                            </Button>
-                        </div>
+                                <TabsContent value="knowledge" className="mt-0 h-full animate-in slide-in-from-right-2 duration-300">
+                                    <div className="bg-yellow-50/50 p-4 rounded-2xl border border-yellow-100/50 flex items-start gap-3 mb-4">
+                                        <div className="p-1.5 bg-yellow-100 rounded-lg text-yellow-600">
+                                            <FileText className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-bold text-yellow-800">Base Privada</h4>
+                                            <p className="text-[11px] text-yellow-600/80 mt-0.5">Os arquivos carregados aqui serão usados apenas por este canal/agente.</p>
+                                        </div>
+                                    </div>
+                                    <KnowledgeBase instanceId={editingAIInstance.id} />
+                                </TabsContent>
+                            </div>
+                        </Tabs>
+
+                        {/* Footer - Only show buttons if behavior tab is active */}
+                        {activeAITab === "behavior" && (
+                            <div className="p-6 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-3">
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => setShowPromptModal(false)}
+                                    className="rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    onClick={updateAIConfig}
+                                    disabled={savingAI}
+                                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold h-12 px-8 rounded-xl shadow-xl shadow-purple-200 min-w-[140px]"
+                                >
+                                    {savingAI ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar Configurações"}
+                                </Button>
+                            </div>
+                        )}
+                        {activeAITab === "knowledge" && (
+                            <div className="p-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-center">
+                                <p className="text-[10px] text-gray-400 font-medium italic">As alterações na base de conhecimento são salvas automaticamente após o upload.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -861,37 +894,7 @@ const Canais = () => {
                 </div>
             )}
 
-            {/* Modal: Base de Conhecimento (PDF) */}
-            {showKnowledgeModal && editingKnowledgeInstance && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full overflow-hidden border border-purple-100 flex flex-col max-h-[90vh]">
-                        {/* Header */}
-                        <div className="p-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
-                                    <FileText className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-bold">Base de Conhecimento (PDF)</h3>
-                                    <p className="text-purple-100 text-xs mt-0.5">Treine o Agente IA da instância: {editingKnowledgeInstance.name}</p>
-                                </div>
-                            </div>
-                            <button onClick={() => setShowKnowledgeModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                                <XCircle className="w-6 h-6" />
-                            </button>
-                        </div>
-
-                        <div className="p-6 overflow-y-auto">
-                            <KnowledgeBase instanceId={editingKnowledgeInstance.id} />
-                        </div>
-
-                        {/* Footer */}
-                        <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
-                            <p className="text-[10px] text-gray-400 font-medium">Os arquivos carregados aqui serão usados exclusivamente por esta instância via RAG (Retrieval-Augmented Generation).</p>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Modal: Base de Conhecimento (PDF) Removido pois agora está dentro do Agente IA */}
         </div>
     );
 };
