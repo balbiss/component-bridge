@@ -1988,10 +1988,9 @@ const distPath = path.join(__dirname, '../dist');
 if (fs.existsSync(distPath)) {
     console.log(`[SERVER] Servindo frontend estático de: ${distPath}`);
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-        if (!req.path.startsWith('/api/')) {
-            res.sendFile(path.join(distPath, 'index.html'));
-        }
+    // Em Express 5, o catch-all '*' pode ser problemático. Usando regex para SPA.
+    app.get(/^(?!\/api).+/, (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
     });
 }
 
@@ -1999,7 +1998,7 @@ if (fs.existsSync(distPath)) {
 // START
 // ──────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-    console.log(`[WORKER ${process.pid}] NexusBot API v2.0 rodando na porta ${PORT}`);
+    console.log(`[WORKER ${process.pid}] NexusBot API v2.1 rodando na porta ${PORT}`);
 
     // Inicia worker de campanhas (verifica a cada 60s)
     setInterval(() => processCampaigns(supabaseAdmin, { wuzCall, checkPhoneOnWhatsApp }), 60000);
