@@ -1478,8 +1478,21 @@ app.delete('/api/knowledge/:id', authenticateToken, async (req, res) => {
 // Lógica de Processamento de PDF (Extração -> Chunks -> Embeddings)
 async function processPdfDocument(doc, buffer, instanceId) {
     try {
-        const data = await pdf(buffer);
-        const text = data.text.trim();
+        let text = '';
+        if (pdf.PDFParse) {
+            console.log(`[KNOWLEDGE] Usando PDFParse class para documento ${doc.id}`);
+            const parser = new pdf.PDFParse({ data: buffer });
+            const result = await parser.getText();
+            text = result.text.trim();
+        } else {
+            const pdfFunc = typeof pdf === 'function' ? pdf : pdf.default;
+            if (typeof pdfFunc === 'function') {
+                const pdfData = await pdfFunc(buffer);
+                text = pdfData.text.trim();
+            } else {
+                throw new Error('Não foi possível encontrar a classe PDFParse ou a função de parsing');
+            }
+        }
         if (!text) throw new Error('PDF vazio ou sem texto extraível');
 
         // Divisão em chunks (aprox 1000 caracteres com overlap)
