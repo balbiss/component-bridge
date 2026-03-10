@@ -412,6 +412,97 @@ app.get('/api/stats', authenticateToken, async (req, res) => {
     }
 });
 
+// GET /api/leads/:instanceId — Fetch unique leads for the Atendimento view
+app.get('/api/leads/:instanceId', authenticateToken, async (req, res) => {
+    try {
+        const { instanceId } = req.params;
+        const userId = req.user.id;
+
+        // Verify instance belongs to user
+        const { data: inst, error: instError } = await supabaseAdmin
+            .from('instances')
+            .select('id')
+            .eq('id', instanceId)
+            .eq('user_id', userId)
+            .single();
+
+        if (instError || !inst) return res.status(403).json({ error: 'Instância não encontrada ou acesso negado' });
+
+        // Fetch unique contacts from chat_history using a group by logic or distinct
+        // Since Supabase doesn't support GROUP BY easily in JS, we'll fetch latest messages and group them
+        const { data: messages, error: msgError } = await supabaseAdmin
+            .from('chat_history')
+            .select('remote_jid, content, role, created_at')
+            .eq('instance_id', instanceId)
+            .order('created_at', { ascending: false })
+            .limit(1000);
+
+        if (msgError) throw msgError;
+
+        // Group by remote_jid and take the first (latest) message
+        const leadsMap = new Map();
+        for (const m of messages) {
+            if (!leadsMap.has(m.remote_jid)) {
+                leadsMap.set(m.remote_jid, {
+                    remote_jid: m.remote_jid,
+                    last_message: m.content,
+                    last_time: m.created_at,
+                    last_role: m.role
+                });
+            }
+        }
+
+        // Get AI Disabled status for these contacts
+        const jids = Array.from(leadsMap.keys());
+        const { data: disabledStatus } = await supabaseAdmin
+            .from('ai_disabled_contacts')
+            .select('remote_jid, active')
+            .eq('instance_id', instanceId)
+            .in('remote_jid', jids);
+
+        const disabledMap = new Map(disabledStatus?.map(d => [d.remote_jid, d.active]) || []);
+
+        const leads = Array.from(leadsMap.values()).map(l => ({
+            ...l,
+            is_ai_active: !disabledMap.get(l.remote_jid) // If in table with active=true, AI is disabled
+        }));
+
+        res.json(leads);
+    } catch (err) {
+        console.error('[LEADS-ERR]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Endpoint to toggle AI for a specific contact
+app.post('/api/leads/:instanceId/toggle-ai', authenticateToken, async (req, res) => {
+    try {
+        const { instanceId } = req.params;
+        const { remoteJid, active } = req.body; // active = true means AI is ACTIVE
+        const userId = req.user.id;
+
+        // Verify instance
+        const { data: inst } = await supabaseAdmin.from('instances').select('id').eq('id', instanceId).eq('user_id', userId).single();
+        if (!inst) return res.status(403).json({ error: 'Acesso negado' });
+
+        if (active) {
+            // Remove from disabled table to enable AI
+            await supabaseAdmin.from('ai_disabled_contacts').delete().eq('instance_id', instanceId).eq('remote_jid', remoteJid);
+        } else {
+            // Upsert into disabled table to disable AI
+            await supabaseAdmin.from('ai_disabled_contacts').upsert({
+                instance_id: instanceId,
+                remote_jid: remoteJid,
+                active: true
+            });
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ──────────────────────────────────────────────────────────────
 // INSTANCES
 // ──────────────────────────────────────────────────────────────

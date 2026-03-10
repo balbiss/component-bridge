@@ -41,6 +41,7 @@ import Canais from "@/components/Canais";
 import CampaignHistory from "@/components/CampaignHistory";
 import MassDispatch from "@/components/MassDispatch";
 import KnowledgeBase from "./KnowledgeBase";
+import Atendimento from "@/components/Atendimento";
 
 interface NavItem {
   icon: React.ReactNode;
@@ -314,6 +315,8 @@ const Dashboard = () => {
             <MassDispatch onClose={() => setActiveItem("dashboard")} instance={null} />
           ) : activeItem === "conexoes" ? (
             <Canais />
+          ) : activeItem === "atendimento" ? (
+            <Atendimento />
           ) : activeItem === "knowledge" ? (
             <KnowledgeBase />
           ) : (
