@@ -372,35 +372,31 @@ app.get('/api/stats', authenticateToken, async (req, res) => {
         let totalDocs = 0;
 
         if (instanceIds.length > 0) {
-            // Total Messages
-            const { count: msgCount } = await supabaseAdmin
-                .from('chat_history')
-                .select('*', { count: 'exact', head: true })
-                .in('instance_id', instanceIds);
-            totalMessages = msgCount || 0;
+            const [msgRes, aiRes, fuRes, docRes] = await Promise.all([
+                supabaseAdmin
+                    .from('chat_history')
+                    .select('*', { count: 'exact', head: true })
+                    .in('instance_id', instanceIds),
+                supabaseAdmin
+                    .from('chat_history')
+                    .select('*', { count: 'exact', head: true })
+                    .in('instance_id', instanceIds)
+                    .eq('role', 'assistant'),
+                supabaseAdmin
+                    .from('contact_follow_ups')
+                    .select('*', { count: 'exact', head: true })
+                    .in('instance_id', instanceIds)
+                    .eq('status', 'pending'),
+                supabaseAdmin
+                    .from('knowledge_documents')
+                    .select('*', { count: 'exact', head: true })
+                    .in('instance_id', instanceIds)
+            ]);
 
-            // AI Interactions (Assistant role)
-            const { count: aiCount } = await supabaseAdmin
-                .from('chat_history')
-                .select('*', { count: 'exact', head: true })
-                .in('instance_id', instanceIds)
-                .eq('role', 'assistant');
-            aiInteractions = aiCount || 0;
-
-            // Pending Follow-ups
-            const { count: fuCount } = await supabaseAdmin
-                .from('contact_follow_ups')
-                .select('*', { count: 'exact', head: true })
-                .in('instance_id', instanceIds)
-                .eq('status', 'pending');
-            pendingFollowUps = fuCount || 0;
-
-            // Knowledge Documents
-            const { count: docCount } = await supabaseAdmin
-                .from('knowledge_documents')
-                .select('*', { count: 'exact', head: true })
-                .in('instance_id', instanceIds);
-            totalDocs = docCount || 0;
+            totalMessages = msgRes.count || 0;
+            aiInteractions = aiRes.count || 0;
+            pendingFollowUps = fuRes.count || 0;
+            totalDocs = docRes.count || 0;
         }
 
         res.json({

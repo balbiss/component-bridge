@@ -50,23 +50,23 @@ interface NavItem {
 }
 
 const areaData = [
-  { name: "Jan", valor: 4200 },
-  { name: "Fev", valor: 5800 },
-  { name: "Mar", valor: 4900 },
-  { name: "Abr", valor: 7200 },
-  { name: "Mai", valor: 6800 },
-  { name: "Jun", valor: 8900 },
-  { name: "Jul", valor: 9400 },
+  { name: "Jan", mensagens: 2100 },
+  { name: "Fev", mensagens: 3400 },
+  { name: "Mar", mensagens: 4200 },
+  { name: "Abr", mensagens: 2800 },
+  { name: "Mai", mensagens: 5600 },
+  { name: "Jun", mensagens: 7200 },
+  { name: "Jul", mensagens: 8100 },
 ];
 
 const barData = [
-  { name: "Seg", tarefas: 12 },
-  { name: "Ter", tarefas: 19 },
-  { name: "Qua", tarefas: 8 },
-  { name: "Qui", tarefas: 22 },
-  { name: "Sex", tarefas: 16 },
-  { name: "Sáb", tarefas: 5 },
-  { name: "Dom", tarefas: 3 },
+  { name: "Seg", interacoes: 12 },
+  { name: "Ter", interacoes: 19 },
+  { name: "Qua", interacoes: 15 },
+  { name: "Qui", interacoes: 22 },
+  { name: "Sex", interacoes: 18 },
+  { name: "Sáb", interacoes: 8 },
+  { name: "Dom", interacoes: 5 },
 ];
 
 // Stats will be managed inside the component state now.
@@ -256,7 +256,10 @@ const Dashboard = () => {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 <div className="rounded-xl border border-gray-200 bg-white p-5">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-4">Receita mensal</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-purple-600" />
+                    Mensagens Enviadas
+                  </h3>
                   <div className="h-[220px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={areaData}>
@@ -270,14 +273,17 @@ const Dashboard = () => {
                         <XAxis dataKey="name" tick={{ fill: "#9ca3af", fontSize: 12 }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fill: "#9ca3af", fontSize: 12 }} axisLine={false} tickLine={false} />
                         <Tooltip />
-                        <Area type="monotone" dataKey="valor" stroke="#a855f7" fill="url(#purpleGrad)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="mensagens" stroke="#a855f7" fill="url(#purpleGrad)" strokeWidth={2} />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
                 <div className="rounded-xl border border-gray-200 bg-white p-5">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-4">Tarefas por dia</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-purple-600" />
+                    Interações de IA por Dia
+                  </h3>
                   <div className="h-[220px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={barData}>
@@ -285,7 +291,7 @@ const Dashboard = () => {
                         <XAxis dataKey="name" tick={{ fill: "#9ca3af", fontSize: 12 }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fill: "#9ca3af", fontSize: 12 }} axisLine={false} tickLine={false} />
                         <Tooltip />
-                        <Bar dataKey="tarefas" fill="#a855f7" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="interacoes" fill="#a855f7" radius={[6, 6, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
