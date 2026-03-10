@@ -348,6 +348,75 @@ app.get('/', (_req, res) => res.json({
 }));
 
 // ──────────────────────────────────────────────────────────────
+// DASHBOARD STATS
+// ──────────────────────────────────────────────────────────────
+app.get('/api/stats', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // 1. Get user instance IDs and connections count
+        const { data: userInstances, error: instError } = await supabaseAdmin
+            .from('instances')
+            .select('id, status')
+            .eq('user_id', userId);
+
+        if (instError) throw instError;
+
+        const instanceIds = userInstances?.map(i => i.id) || [];
+        const activeConnections = userInstances?.filter(i => i.status === 'connected' || i.status === 'ready').length || 0;
+
+        // 2. Aggregate metrics from other tables
+        let totalMessages = 0;
+        let aiInteractions = 0;
+        let pendingFollowUps = 0;
+        let totalDocs = 0;
+
+        if (instanceIds.length > 0) {
+            // Total Messages
+            const { count: msgCount } = await supabaseAdmin
+                .from('chat_history')
+                .select('*', { count: 'exact', head: true })
+                .in('instance_id', instanceIds);
+            totalMessages = msgCount || 0;
+
+            // AI Interactions (Assistant role)
+            const { count: aiCount } = await supabaseAdmin
+                .from('chat_history')
+                .select('*', { count: 'exact', head: true })
+                .in('instance_id', instanceIds)
+                .eq('role', 'assistant');
+            aiInteractions = aiCount || 0;
+
+            // Pending Follow-ups
+            const { count: fuCount } = await supabaseAdmin
+                .from('contact_follow_ups')
+                .select('*', { count: 'exact', head: true })
+                .in('instance_id', instanceIds)
+                .eq('status', 'pending');
+            pendingFollowUps = fuCount || 0;
+
+            // Knowledge Documents
+            const { count: docCount } = await supabaseAdmin
+                .from('knowledge_documents')
+                .select('*', { count: 'exact', head: true })
+                .in('instance_id', instanceIds);
+            totalDocs = docCount || 0;
+        }
+
+        res.json({
+            totalMessages,
+            aiInteractions,
+            activeConnections,
+            pendingFollowUps,
+            totalDocs
+        });
+    } catch (err) {
+        console.error('[STATS-ERR]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ──────────────────────────────────────────────────────────────
 // INSTANCES
 // ──────────────────────────────────────────────────────────────
 

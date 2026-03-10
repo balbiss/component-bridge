@@ -35,6 +35,8 @@ import {
 } from "recharts";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
+import { getAuthHeader, API } from "@/lib/api";
+import axios from "axios";
 import Canais from "@/components/Canais";
 import CampaignHistory from "@/components/CampaignHistory";
 import MassDispatch from "@/components/MassDispatch";
@@ -67,12 +69,7 @@ const barData = [
   { name: "Dom", tarefas: 3 },
 ];
 
-const stats = [
-  { title: "Receita total", value: "R$ 45.231", change: "+20.1% do mês passado", icon: <DollarSign className="w-4 h-4" />, trend: "up" as const },
-  { title: "Usuários ativos", value: "+2.350", change: "+180.1% do mês passado", icon: <Users className="w-4 h-4" />, trend: "up" as const },
-  { title: "Vendas", value: "+12.234", change: "+19% do mês passado", icon: <ShoppingCart className="w-4 h-4" />, trend: "up" as const },
-  { title: "Ativos agora", value: "+573", change: "+201 desde última hora", icon: <Activity className="w-4 h-4" />, trend: "up" as const },
-];
+// Stats will be managed inside the component state now.
 
 const recentOrders = [
   { id: "1", customer: "Ana Silva", email: "ana@email.com", amount: "R$ 1.999", status: "Concluído" },
@@ -86,11 +83,45 @@ const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeItem, setActiveItem] = useState("dashboard");
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [dashboardStats, setDashboardStats] = useState({
+    totalMessages: 0,
+    aiInteractions: 0,
+    activeConnections: 0,
+    pendingFollowUps: 0,
+    totalDocs: 0
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  const fetchStats = async () => {
+    try {
+      const headers = await getAuthHeader();
+      const res = await axios.get(`${API}/stats`, { headers });
+      setDashboardStats(res.data);
+    } catch (err) {
+      console.error("Erro ao buscar stats:", err);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    fetchStats();
+    // Refresh every 30 seconds
+    const statsTimer = setInterval(fetchStats, 30000);
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(statsTimer);
+    };
   }, []);
+
+  const statsList = [
+    { title: "Total de Mensagens", value: dashboardStats.totalMessages.toLocaleString('pt-BR'), change: "Total de interações", icon: <MessageSquare className="w-4 h-4" />, trend: "up" as const, color: "bg-blue-100 text-blue-600" },
+    { title: "IA Ativa (Respostas)", value: dashboardStats.aiInteractions.toLocaleString('pt-BR'), change: "Respostas automáticas", icon: <Zap className="w-4 h-4" />, trend: "up" as const, color: "bg-yellow-100 text-yellow-600" },
+    { title: "Follow-ups Ativos", value: dashboardStats.pendingFollowUps.toString(), change: "Agendados para sair", icon: <Bell className="w-4 h-4" />, trend: "up" as const, color: "bg-purple-100 text-purple-600" },
+    { title: "Sessões Ativas", value: dashboardStats.activeConnections.toString(), change: "Canais operando", icon: <Activity className="w-4 h-4" />, trend: "up" as const, color: "bg-green-100 text-green-600" },
+  ];
 
   const navItems: NavItem[] = [
     { icon: <LayoutDashboard className="w-4 h-4" />, label: "Dashboard", href: "dashboard" },
@@ -199,19 +230,26 @@ const Dashboard = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {stats.map((stat, i) => (
-                  <div key={i} className="rounded-xl border border-gray-200 bg-white p-5 hover:shadow-md transition-shadow">
+                {statsList.map((stat, i) => (
+                  <div key={i} className="rounded-xl border border-gray-200 bg-white p-5 hover:shadow-md transition-shadow relative overflow-hidden group">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm text-gray-500">{stat.title}</p>
-                      <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                        <span className="text-purple-600">{stat.icon}</span>
+                      <p className="text-sm font-medium text-gray-500">{stat.title}</p>
+                      <div className={`w-8 h-8 rounded-lg ${stat.color} flex items-center justify-center`}>
+                        {stat.icon}
                       </div>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                      <TrendingUp className="w-3 h-3" />
-                      {stat.change}
-                    </p>
+                    <div>
+                      {loadingStats ? (
+                        <div className="h-8 w-24 bg-gray-100 animate-pulse rounded-md" />
+                      ) : (
+                        <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                      )}
+                      <p className="text-[10px] sm:text-xs text-gray-400 mt-1 flex items-center gap-1 font-medium">
+                        {stat.change}
+                      </p>
+                    </div>
+                    {/* Subtle bottom line indicator */}
+                    <div className={`absolute bottom-0 left-0 h-1 transition-all duration-500 w-0 group-hover:w-full ${stat.color.split(' ')[1].replace('text-', 'bg-')}`} />
                   </div>
                 ))}
               </div>
