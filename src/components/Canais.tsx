@@ -498,7 +498,7 @@ const Canais = () => {
 
                         <Tabs value={activeAITab} onValueChange={setActiveAITab} className="flex-1 flex flex-col overflow-hidden">
                             <div className="px-4 sm:px-6 pt-4 bg-gray-50/50 border-b border-gray-100">
-                                <TabsList className="grid w-full grid-cols-2 bg-gray-100/50 p-1 rounded-xl">
+                                <TabsList className="grid w-full grid-cols-3 bg-gray-100/50 p-1 rounded-xl">
                                     <TabsTrigger value="behavior" className="rounded-lg font-bold text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all py-2">
                                         🤖 Comportamento
                                     </TabsTrigger>
@@ -593,20 +593,22 @@ const Canais = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100 gap-3">
                                         <div className="space-y-0.5">
                                             <Label className="text-sm font-bold text-gray-700">Ativar Follow-ups</Label>
                                             <p className="text-[10px] text-gray-500">Enviar mensagens de acompanhamento automáticas</p>
                                         </div>
-                                        <Switch
-                                            checked={followUpActive}
-                                            onCheckedChange={setFollowUpActive}
-                                        />
+                                        <div className="flex justify-start sm:justify-end">
+                                            <Switch
+                                                checked={followUpActive}
+                                                onCheckedChange={setFollowUpActive}
+                                            />
+                                        </div>
                                     </div>
 
                                     {followUpActive && (
                                         <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-2">
                                                     <Label className="text-xs font-bold text-gray-600 uppercase">Qtd. de Mensagens</Label>
                                                     <Input
