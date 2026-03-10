@@ -2016,11 +2016,15 @@ app.use((err, _req, res, _next) => {
 // ──────────────────────────────────────────────────────────────
 async function processFollowUps() {
     try {
+        const now = new Date().toISOString();
+        // console.log(`[FOLLOW-UP-WORKER] Verificando agendamentos até: ${now}`);
+
         const { data: followups, error } = await supabaseAdmin
             .from('contact_follow_ups')
             .select(`
                 *,
                 instances (
+                    id,
                     wuzapi_token,
                     follow_up_active,
                     follow_up_count,
@@ -2029,13 +2033,17 @@ async function processFollowUps() {
                 )
             `)
             .eq('status', 'pending')
-            .lte('next_follow_up_at', new Date().toISOString())
+            .lte('next_follow_up_at', now)
             .limit(20);
 
-        if (error) throw error;
+        if (error) {
+            console.error('[FOLLOW-UP-WORKER] Erro na query:', error.message);
+            return;
+        }
+
         if (!followups || followups.length === 0) return;
 
-        console.log(`[FOLLOW-UP-WORKER] Processando ${followups.length} pendentes...`);
+        console.log(`[FOLLOW-UP-WORKER] Encontrados ${followups.length} pendentes para processar.`);
 
         for (const fu of followups) {
             const inst = fu.instances;
@@ -2054,11 +2062,10 @@ async function processFollowUps() {
 
             // Send message
             try {
-                const wuzapiBase = process.env.WUZAPI_URL;
-                await axios.post(`${wuzapiBase}/chat/send/text`, {
+                await wuzCall('POST', '/chat/send/text', {
                     Phone: fu.remote_jid,
                     Body: currentMsg
-                }, { headers: { token: inst.wuzapi_token } });
+                }, { token: inst.wuzapi_token });
 
                 console.log(`[FOLLOW-UP-WORKER] Mensagem enviada para ${fu.remote_jid} (Passo ${fu.current_step + 1})`);
 
@@ -2117,8 +2124,8 @@ app.listen(PORT, () => {
     // Inicia worker de campanhas (verifica a cada 60s)
     setInterval(() => processCampaigns(supabaseAdmin, { wuzCall, checkPhoneOnWhatsApp }), 60000);
 
-    // Inicia worker de follow-ups (verifica a cada 2 min)
-    setInterval(() => processFollowUps(), 120000);
+    // Inicia worker de follow-ups (verifica a cada 60s)
+    setInterval(() => processFollowUps(), 60000);
 });
 
 module.exports = {
