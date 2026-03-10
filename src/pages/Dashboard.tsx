@@ -42,6 +42,7 @@ import CampaignHistory from "@/components/CampaignHistory";
 import MassDispatch from "@/components/MassDispatch";
 import KnowledgeBase from "./KnowledgeBase";
 import Atendimento from "@/components/Atendimento";
+import Relatorios from "@/components/Relatorios";
 
 interface NavItem {
   icon: React.ReactNode;
@@ -127,9 +128,6 @@ const Dashboard = () => {
   const navItems: NavItem[] = [
     { icon: <LayoutDashboard className="w-4 h-4" />, label: "Dashboard", href: "dashboard" },
     { icon: <MessageSquare className="w-4 h-4" />, label: "Atendimento", href: "atendimento", badge: 12 },
-    { icon: <Bot className="w-4 h-4" />, label: "Agentes/IA", href: "agentes" },
-    { icon: <Book className="w-4 h-4" />, label: "Conhecimento (PDF)", href: "knowledge" },
-    { icon: <Users className="w-4 h-4" />, label: "Contatos / CRM", href: "contatos" },
     { icon: <BarChart3 className="w-4 h-4" />, label: "Relatórios", href: "relatorios" },
     { icon: <Link2 className="w-4 h-4" />, label: "Canais / Conexões", href: "conexoes" },
   ];
@@ -317,6 +315,8 @@ const Dashboard = () => {
             <Canais />
           ) : activeItem === "atendimento" ? (
             <Atendimento />
+          ) : activeItem === "relatorios" ? (
+            <Relatorios />
           ) : activeItem === "knowledge" ? (
             <KnowledgeBase />
           ) : (

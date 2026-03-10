@@ -503,6 +503,88 @@ app.post('/api/leads/:instanceId/toggle-ai', authenticateToken, async (req, res)
     }
 });
 
+// GET /api/reports — Detailed metrics for charts
+app.get('/api/reports', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { data: userInstances } = await supabaseAdmin.from('instances').select('id, name').eq('user_id', userId);
+        const instanceIds = userInstances?.map(i => i.id) || [];
+
+        if (instanceIds.length === 0) {
+            return res.json({ dailyMessages: [], iaVsHuman: { ia: 0, human: 0 }, topInstances: [] });
+        }
+
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        // 1. Daily messages (last 7 days)
+        const { data: dailyData } = await supabaseAdmin
+            .from('chat_history')
+            .select('created_at')
+            .in('instance_id', instanceIds)
+            .gte('created_at', sevenDaysAgo.toISOString());
+
+        const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        const dailyStats = {};
+        // Initialize last 7 days
+        for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const label = dayLabels[d.getDay()];
+            dailyStats[label] = 0;
+        }
+
+        dailyData?.forEach(m => {
+            const label = dayLabels[new Date(m.created_at).getDay()];
+            if (dailyStats.hasOwnProperty(label)) dailyStats[label]++;
+        });
+
+        const dailyMessages = Object.entries(dailyStats).map(([name, count]) => ({ name, count })).reverse();
+
+        // 2. IA vs Human (Total)
+        const { count: iaCount } = await supabaseAdmin
+            .from('chat_history')
+            .select('*', { count: 'exact', head: true })
+            .in('instance_id', instanceIds)
+            .eq('role', 'assistant');
+
+        const { count: totalCount } = await supabaseAdmin
+            .from('chat_history')
+            .select('*', { count: 'exact', head: true })
+            .in('instance_id', instanceIds);
+
+        const humanCount = (totalCount || 0) - (iaCount || 0);
+
+        // 3. Top Instances
+        const instanceStats = {};
+        const { data: msgPerInst } = await supabaseAdmin
+            .from('chat_history')
+            .select('instance_id')
+            .in('instance_id', instanceIds);
+
+        msgPerInst?.forEach(m => {
+            instanceStats[m.instance_id] = (instanceStats[m.instance_id] || 0) + 1;
+        });
+
+        const topInstances = userInstances.map(inst => ({
+            name: inst.name,
+            messages: instanceStats[inst.id] || 0
+        })).sort((a, b) => b.messages - a.messages).slice(0, 5);
+
+        res.json({
+            dailyMessages,
+            iaVsHuman: {
+                ia: iaCount || 0,
+                human: humanCount > 0 ? humanCount : 0
+            },
+            topInstances
+        });
+    } catch (err) {
+        console.error('[REPORTS-ERR]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ──────────────────────────────────────────────────────────────
 // INSTANCES
 // ──────────────────────────────────────────────────────────────
