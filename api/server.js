@@ -523,8 +523,7 @@ app.post('/api/instances/:id/ai', authenticateToken, async (req, res) => {
 // POST /api/instances/:id/prompt - update AI System Prompt
 app.post('/api/instances/:id/prompt', authenticateToken, async (req, res) => {
     try {
-        const { id } = req.params;
-        const { system_prompt, ai_delay_min, ai_delay_max } = req.body;
+        const { system_prompt, ai_delay_min, ai_delay_max, follow_up_active, follow_up_count, follow_up_delay, follow_up_messages } = req.body;
 
         const supaUser = getSupabaseForUser(req.token);
 
@@ -532,6 +531,10 @@ app.post('/api/instances/:id/prompt', authenticateToken, async (req, res) => {
         if (system_prompt !== undefined) updateData.system_prompt = system_prompt;
         if (ai_delay_min !== undefined) updateData.ai_delay_min = ai_delay_min;
         if (ai_delay_max !== undefined) updateData.ai_delay_max = ai_delay_max;
+        if (follow_up_active !== undefined) updateData.follow_up_active = follow_up_active;
+        if (follow_up_count !== undefined) updateData.follow_up_count = follow_up_count;
+        if (follow_up_delay !== undefined) updateData.follow_up_delay = follow_up_delay;
+        if (follow_up_messages !== undefined) updateData.follow_up_messages = follow_up_messages;
 
         const { data, error } = await supaUser
             .from('instances')
@@ -962,6 +965,14 @@ app.post('/api/webhook', async (req, res) => {
             return;
         }
 
+        // --- FOLLOW-UP: STOP ON USER MESSAGE ---
+        try {
+            await supabaseAdmin.from('contact_follow_ups').delete().eq('instance_id', instance.id).eq('remote_jid', remoteJid);
+            console.log(`[FOLLOW-UP] Removido para ${remoteJid} devido a nova mensagem.`);
+        } catch (fErr) {
+            console.error(`[FOLLOW-UP] Erro ao remover:`, fErr.message);
+        }
+
         const wuzapiBase = process.env.WUZAPI_URL;
         const wuzapiHeaders = { token: token };
 
@@ -1229,6 +1240,24 @@ app.post('/api/webhook', async (req, res) => {
         try {
             await axios.post(`${wuzapiBase}/chat/presence`, { Phone: from, State: 'paused' }, { headers: wuzapiHeaders });
         } catch (e) { }
+
+        // --- FOLLOW-UP: SCHEDULE NEXT ---
+        if (instance.follow_up_active && instance.follow_up_count > 0) {
+            const nextTime = new Date(Date.now() + (instance.follow_up_delay || 30) * 60000);
+            try {
+                await supabaseAdmin.from('contact_follow_ups').upsert({
+                    instance_id: instance.id,
+                    remote_jid: remoteJid,
+                    current_step: 0,
+                    next_follow_up_at: nextTime.toISOString(),
+                    status: 'pending',
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'instance_id,remote_jid' });
+                console.log(`[FOLLOW-UP] Agendado para ${remoteJid} em ${nextTime.toISOString()}`);
+            } catch (fErr) {
+                console.error(`[FOLLOW-UP] Erro ao agendar:`, fErr.message);
+            }
+        }
 
     } catch (err) {
         console.error('Webhook processing Error:', err.message);
@@ -1982,6 +2011,90 @@ app.use((err, _req, res, _next) => {
 });
 
 // ──────────────────────────────────────────────────────────────
+// FOLLOW-UP WORKER
+// ──────────────────────────────────────────────────────────────
+async function processFollowUps() {
+    try {
+        const { data: followups, error } = await supabaseAdmin
+            .from('contact_follow_ups')
+            .select(`
+                *,
+                instances (
+                    wuzapi_token,
+                    follow_up_active,
+                    follow_up_count,
+                    follow_up_delay,
+                    follow_up_messages
+                )
+            `)
+            .eq('status', 'pending')
+            .lte('next_follow_up_at', new Date().toISOString())
+            .limit(20);
+
+        if (error) throw error;
+        if (!followups || followups.length === 0) return;
+
+        console.log(`[FOLLOW-UP-WORKER] Processando ${followups.length} pendentes...`);
+
+        for (const fu of followups) {
+            const inst = fu.instances;
+            if (!inst || !inst.follow_up_active || !inst.follow_up_messages) {
+                await supabaseAdmin.from('contact_follow_ups').update({ status: 'canceled' }).eq('id', fu.id);
+                continue;
+            }
+
+            const messages = Array.isArray(inst.follow_up_messages) ? inst.follow_up_messages : [];
+            const currentMsg = messages[fu.current_step];
+
+            if (!currentMsg) {
+                await supabaseAdmin.from('contact_follow_ups').update({ status: 'completed' }).eq('id', fu.id);
+                continue;
+            }
+
+            // Send message
+            try {
+                const wuzapiBase = process.env.WUZAPI_URL;
+                await axios.post(`${wuzapiBase}/chat/send/text`, {
+                    Phone: fu.remote_jid,
+                    Body: currentMsg
+                }, { headers: { token: inst.wuzapi_token } });
+
+                console.log(`[FOLLOW-UP-WORKER] Mensagem enviada para ${fu.remote_jid} (Passo ${fu.current_step + 1})`);
+
+                // Save to history
+                await supabaseAdmin.from('chat_history').insert({
+                    instance_id: fu.instance_id,
+                    remote_jid: fu.remote_jid,
+                    role: 'assistant',
+                    content: `[FOLLOW-UP] ${currentMsg}`
+                });
+
+                const nextStep = fu.current_step + 1;
+                if (nextStep >= inst.follow_up_count || nextStep >= messages.length) {
+                    await supabaseAdmin.from('contact_follow_ups').update({
+                        status: 'completed',
+                        current_step: nextStep,
+                        updated_at: new Date().toISOString()
+                    }).eq('id', fu.id);
+                } else {
+                    const nextTime = new Date(Date.now() + (inst.follow_up_delay || 30) * 60000);
+                    await supabaseAdmin.from('contact_follow_ups').update({
+                        current_step: nextStep,
+                        next_follow_up_at: nextTime.toISOString(),
+                        updated_at: new Date().toISOString()
+                    }).eq('id', fu.id);
+                }
+            } catch (sendErr) {
+                console.error(`[FOLLOW-UP-WORKER] Erro ao enviar para ${fu.remote_jid}:`, sendErr.message);
+                // retry next time
+            }
+        }
+    } catch (err) {
+        console.error('[FOLLOW-UP-WORKER] Erro fatal:', err.message);
+    }
+}
+
+// ──────────────────────────────────────────────────────────────
 // SERVE STATIC FILES (Frontend)
 // ──────────────────────────────────────────────────────────────
 const distPath = path.join(__dirname, '../dist');
@@ -2002,6 +2115,9 @@ app.listen(PORT, () => {
 
     // Inicia worker de campanhas (verifica a cada 60s)
     setInterval(() => processCampaigns(supabaseAdmin, { wuzCall, checkPhoneOnWhatsApp }), 60000);
+
+    // Inicia worker de follow-ups (verifica a cada 2 min)
+    setInterval(() => processFollowUps(), 120000);
 });
 
 module.exports = {

@@ -41,6 +41,10 @@ const Canais = () => {
     const [tempDelayMax, setTempDelayMax] = useState(5000);
     const [savingAI, setSavingAI] = useState(false);
     const [activeAITab, setActiveAITab] = useState("behavior");
+    const [followUpActive, setFollowUpActive] = useState(false);
+    const [followUpCount, setFollowUpCount] = useState(0);
+    const [followUpDelay, setFollowUpDelay] = useState(30);
+    const [followUpMessages, setFollowUpMessages] = useState<string[]>([]);
 
     // --- HUMAN HANDOVER & RODIZIO STATES ---
     const [showHandoverModal, setShowHandoverModal] = useState(false);
@@ -208,7 +212,11 @@ const Canais = () => {
             await axios.post(url, {
                 system_prompt: tempPrompt,
                 ai_delay_min: tempDelayMin,
-                ai_delay_max: tempDelayMax
+                ai_delay_max: tempDelayMax,
+                follow_up_active: followUpActive,
+                follow_up_count: followUpCount,
+                follow_up_delay: followUpDelay,
+                follow_up_messages: followUpMessages
             }, { headers });
 
             toast.success("Configurações da IA atualizadas! 🤖✨");
@@ -255,6 +263,10 @@ const Canais = () => {
         setTempPrompt(instance.system_prompt || "");
         setTempDelayMin(instance.ai_delay_min || 2000);
         setTempDelayMax(instance.ai_delay_max || 5000);
+        setFollowUpActive(instance.follow_up_active || false);
+        setFollowUpCount(instance.follow_up_count || 0);
+        setFollowUpDelay(instance.follow_up_delay || 30);
+        setFollowUpMessages(instance.follow_up_messages || []);
         setActiveAITab(tab);
         setShowPromptModal(true);
     };
@@ -493,6 +505,9 @@ const Canais = () => {
                                     <TabsTrigger value="knowledge" className="rounded-lg font-bold text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all py-2">
                                         📚 Conhecimento
                                     </TabsTrigger>
+                                    <TabsTrigger value="followup" className="rounded-lg font-bold text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all py-2">
+                                        🔔 Follow-ups
+                                    </TabsTrigger>
                                 </TabsList>
                             </div>
 
@@ -566,11 +581,89 @@ const Canais = () => {
                                     </div>
                                     <KnowledgeBase instanceId={editingAIInstance.id} />
                                 </TabsContent>
+
+                                <TabsContent value="followup" className="mt-0 space-y-6 animate-in slide-in-from-right-2 duration-300">
+                                    <div className="bg-purple-50/50 p-4 rounded-2xl border border-purple-100/50 flex items-start gap-3">
+                                        <div className="p-1.5 bg-purple-100 rounded-lg text-purple-600">
+                                            <RefreshCw className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-bold text-purple-800">Reativação Inteligente</h4>
+                                            <p className="text-[11px] text-purple-600/80 mt-0.5">O Agente enviará mensagens automáticas se o cliente parar de responder.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                        <div className="space-y-0.5">
+                                            <Label className="text-sm font-bold text-gray-700">Ativar Follow-ups</Label>
+                                            <p className="text-[10px] text-gray-500">Enviar mensagens de acompanhamento automáticas</p>
+                                        </div>
+                                        <Switch
+                                            checked={followUpActive}
+                                            onCheckedChange={setFollowUpActive}
+                                        />
+                                    </div>
+
+                                    {followUpActive && (
+                                        <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-bold text-gray-600 uppercase">Qtd. de Mensagens</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        max="5"
+                                                        value={followUpCount}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value) || 0;
+                                                            setFollowUpCount(val);
+                                                            const newMsgs = [...followUpMessages];
+                                                            while (newMsgs.length < val) newMsgs.push("");
+                                                            setFollowUpMessages(newMsgs.slice(0, val));
+                                                        }}
+                                                        className="rounded-xl"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs font-bold text-gray-600 uppercase">Intervalo (minutos)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        min="1"
+                                                        value={followUpDelay}
+                                                        onChange={(e) => setFollowUpDelay(parseInt(e.target.value) || 1)}
+                                                        className="rounded-xl"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                {Array.from({ length: followUpCount }).map((_, idx) => (
+                                                    <div key={idx} className="space-y-2">
+                                                        <Label className="text-xs font-bold text-purple-600 uppercase flex items-center gap-2">
+                                                            <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-[10px]">{idx + 1}</div>
+                                                            Mensagem de Follow-up {idx + 1}
+                                                        </Label>
+                                                        <textarea
+                                                            value={followUpMessages[idx] || ""}
+                                                            onChange={(e) => {
+                                                                const newMsgs = [...followUpMessages];
+                                                                newMsgs[idx] = e.target.value;
+                                                                setFollowUpMessages(newMsgs);
+                                                            }}
+                                                            placeholder={`Ex: Oi! Ainda está por aí? Precisava de mais alguma ajuda?`}
+                                                            className="w-full min-h-[80px] p-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm transition-all"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </TabsContent>
                             </div>
                         </Tabs>
 
-                        {/* Footer - Only show buttons if behavior tab is active */}
-                        {activeAITab === "behavior" && (
+                        {/* Footer - show buttons for behavior and followup tabs */}
+                        {(activeAITab === "behavior" || activeAITab === "followup") && (
                             <div className="p-4 sm:p-6 bg-gray-50/80 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-end gap-3">
                                 <Button
                                     variant="ghost"
@@ -584,7 +677,7 @@ const Canais = () => {
                                     disabled={savingAI}
                                     className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold h-11 sm:h-12 px-8 rounded-xl shadow-xl shadow-purple-200 min-w-[140px]"
                                 >
-                                    {savingAI ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar Agente"}
+                                    {savingAI ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar Configurações"}
                                 </Button>
                             </div>
                         )}
@@ -985,8 +1078,22 @@ const InstanceCard = ({
                 setShowMenu(false);
             }
         },
-        { label: "Tempo de Reativação", emoji: "🕓" },
-        { label: "Follow-ups", emoji: "🔔" },
+        {
+            label: "Tempo de Reativação",
+            emoji: "🕓",
+            action: () => {
+                onEditAI(instance, "behavior");
+                setShowAIMenu(false);
+            }
+        },
+        {
+            label: "Follow-ups",
+            emoji: "🔔",
+            action: () => {
+                onEditAI(instance, "followup");
+                setShowAIMenu(false);
+            }
+        },
     ];
 
     return (
