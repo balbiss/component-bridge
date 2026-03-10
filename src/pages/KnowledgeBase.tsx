@@ -267,9 +267,9 @@ const KnowledgeBase = ({ instanceId }: KnowledgeBaseProps) => {
                             <thead>
                                 <tr className="bg-gray-50/50">
                                     <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Documento</th>
-                                    <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tamanho</th>
+                                    <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell">Tamanho</th>
                                     <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Data de Envio</th>
+                                    <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Data de Envio</th>
                                     <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Ações</th>
                                 </tr>
                             </thead>
@@ -281,19 +281,21 @@ const KnowledgeBase = ({ instanceId }: KnowledgeBaseProps) => {
                                                 <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500">
                                                     <FileText className="w-4 h-4" />
                                                 </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-gray-900 leading-none">{doc.file_name}</p>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-bold text-gray-900 leading-none truncate max-w-[120px] sm:max-w-[200px] md:max-w-xs" title={doc.file_name}>
+                                                        {doc.file_name}
+                                                    </p>
                                                     <p className="text-[10px] text-gray-400 mt-1">ID: {doc.id.substring(0, 8)}</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-5 py-4 text-xs font-medium text-gray-600">
+                                        <td className="px-5 py-4 text-xs font-medium text-gray-600 hidden md:table-cell">
                                             {formatFileSize(doc.file_size)}
                                         </td>
                                         <td className="px-5 py-4">
                                             {getStatusBadge(doc.status)}
                                         </td>
-                                        <td className="px-5 py-4 text-xs text-gray-500">
+                                        <td className="px-5 py-4 text-xs text-gray-500 hidden sm:table-cell">
                                             {new Date(doc.created_at).toLocaleDateString('pt-BR')}
                                         </td>
                                         <td className="px-5 py-4 text-right">

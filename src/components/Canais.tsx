@@ -467,9 +467,9 @@ const Canais = () => {
             {/* Modal: Agente IA (Configuração + Base de Conhecimento) */}
             {showPromptModal && editingAIInstance && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-purple-100 flex flex-col max-h-[90vh]">
+                    <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-purple-100 flex flex-col max-h-[95vh] sm:max-h-[90vh]">
                         {/* Header */}
-                        <div className="p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white flex items-center justify-between">
+                        <div className="p-4 sm:p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
                                     <Bot className="w-6 h-6" />
@@ -496,7 +496,7 @@ const Canais = () => {
                                 </TabsList>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-6">
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                                 <TabsContent value="behavior" className="mt-0 space-y-6 animate-in slide-in-from-left-2 duration-300">
                                     {/* System Prompt Section */}
                                     <div className="space-y-3">
