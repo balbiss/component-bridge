@@ -523,6 +523,7 @@ app.post('/api/instances/:id/ai', authenticateToken, async (req, res) => {
 // POST /api/instances/:id/prompt - update AI System Prompt
 app.post('/api/instances/:id/prompt', authenticateToken, async (req, res) => {
     try {
+        const { id } = req.params;
         const { system_prompt, ai_delay_min, ai_delay_max, follow_up_active, follow_up_count, follow_up_delay, follow_up_messages } = req.body;
 
         const supaUser = getSupabaseForUser(req.token);
