@@ -210,22 +210,55 @@ const KnowledgeBase = ({ instanceId }: KnowledgeBaseProps) => {
 
             {/* Main Content */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-50 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-between">
-                        <h3 className="text-base font-bold text-gray-900 whitespace-nowrap">Documentos da Base</h3>
+                <div className="p-4 sm:p-5 border-b border-gray-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                        <h3 className="text-sm sm:text-base font-bold text-gray-900 whitespace-nowrap">Documentos da Base</h3>
 
-                        {/* Internal Upload for Modal view */}
+                        {/* Mobile Upload Button */}
                         {instanceId && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center sm:hidden">
                                 <Input
                                     type="file"
                                     accept=".pdf"
                                     onChange={handleFileUpload}
                                     disabled={uploading}
                                     className="hidden"
-                                    id="pdf-upload-modal"
+                                    id="pdf-upload-modal-mobile"
                                 />
-                                <label htmlFor="pdf-upload-modal">
+                                <label htmlFor="pdf-upload-modal-mobile">
+                                    <Button asChild size="sm" disabled={uploading} className="bg-purple-600 hover:bg-purple-700 text-white cursor-pointer h-9 px-3 rounded-lg">
+                                        <span>
+                                            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FilePlus className="w-4 h-4" />}
+                                        </span>
+                                    </Button>
+                                </label>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <Input
+                                placeholder="Buscar..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 h-10 sm:h-9 text-sm rounded-xl border-gray-200 w-full"
+                            />
+                        </div>
+
+                        {/* Desktop Upload Button */}
+                        {instanceId && (
+                            <div className="hidden sm:block">
+                                <Input
+                                    type="file"
+                                    accept=".pdf"
+                                    onChange={handleFileUpload}
+                                    disabled={uploading}
+                                    className="hidden"
+                                    id="pdf-upload-modal-desktop"
+                                />
+                                <label htmlFor="pdf-upload-modal-desktop">
                                     <Button asChild size="sm" disabled={uploading} className="bg-purple-600 hover:bg-purple-700 text-white cursor-pointer h-9 px-4 rounded-xl">
                                         <span>
                                             {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FilePlus className="w-4 h-4 mr-2" />}
@@ -235,16 +268,6 @@ const KnowledgeBase = ({ instanceId }: KnowledgeBaseProps) => {
                                 </label>
                             </div>
                         )}
-                    </div>
-
-                    <div className="relative w-full sm:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <Input
-                            placeholder="Buscar documento..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 h-9 text-sm rounded-xl border-gray-200"
-                        />
                     </div>
                 </div>
 
@@ -262,58 +285,99 @@ const KnowledgeBase = ({ instanceId }: KnowledgeBaseProps) => {
                         <p className="text-xs mt-1">Carregue um PDF para começar a treinar sua IA.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50/50">
-                                    <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Documento</th>
-                                    <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell">Tamanho</th>
-                                    <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Data de Envio</th>
-                                    <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {filteredDocs.map((doc) => (
-                                    <tr key={doc.id} className="hover:bg-gray-50/30 transition-colors">
-                                        <td className="px-5 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500">
-                                                    <FileText className="w-4 h-4" />
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-bold text-gray-900 leading-none truncate max-w-[120px] sm:max-w-[200px] md:max-w-xs" title={doc.file_name}>
-                                                        {doc.file_name}
-                                                    </p>
-                                                    <p className="text-[10px] text-gray-400 mt-1">ID: {doc.id.substring(0, 8)}</p>
-                                                </div>
+                    <div className="p-4 sm:p-0">
+                        {/* Mobile View: Cards */}
+                        <div className="grid grid-cols-1 gap-3 sm:hidden">
+                            {filteredDocs.map((doc) => (
+                                <div key={doc.id} className="p-4 bg-gray-50/50 border border-gray-100 rounded-2xl space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-500 shrink-0">
+                                                <FileText className="w-5 h-5" />
                                             </div>
-                                        </td>
-                                        <td className="px-5 py-4 text-xs font-medium text-gray-600 hidden md:table-cell">
-                                            {formatFileSize(doc.file_size)}
-                                        </td>
-                                        <td className="px-5 py-4">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold text-gray-900 truncate" title={doc.file_name}>{doc.file_name}</p>
+                                                <p className="text-[10px] text-gray-400 mt-0.5">ID: {doc.id.substring(0, 8)}</p>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleDelete(doc.id)}
+                                            className="h-8 w-8 text-gray-400 hover:text-red-500 shrink-0"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-2 border-t border-gray-100/50">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-[9px] font-bold text-gray-400 uppercase">Status</span>
                                             {getStatusBadge(doc.status)}
-                                        </td>
-                                        <td className="px-5 py-4 text-xs text-gray-500 hidden sm:table-cell">
-                                            {new Date(doc.created_at).toLocaleDateString('pt-BR')}
-                                        </td>
-                                        <td className="px-5 py-4 text-right">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleDelete(doc.id)}
-                                                className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </td>
+                                        </div>
+                                        <div className="text-right flex flex-col gap-0.5">
+                                            <span className="text-[9px] font-bold text-gray-400 uppercase">Tamanho</span>
+                                            <span className="text-xs font-medium text-gray-600">{formatFileSize(doc.file_size)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Desktop View: Table */}
+                        <div className="hidden sm:block overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Documento</th>
+                                        <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tamanho</th>
+                                        <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Data de Envio</th>
+                                        <th className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right">Ações</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {filteredDocs.map((doc) => (
+                                        <tr key={doc.id} className="hover:bg-gray-50/30 transition-colors">
+                                            <td className="px-5 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500">
+                                                        <FileText className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm font-bold text-gray-900 leading-none truncate max-w-xs" title={doc.file_name}>
+                                                            {doc.file_name}
+                                                        </p>
+                                                        <p className="text-[10px] text-gray-400 mt-1">ID: {doc.id.substring(0, 8)}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-5 py-4 text-xs font-medium text-gray-600">
+                                                {formatFileSize(doc.file_size)}
+                                            </td>
+                                            <td className="px-5 py-4">
+                                                {getStatusBadge(doc.status)}
+                                            </td>
+                                            <td className="px-5 py-4 text-xs text-gray-500">
+                                                {new Date(doc.created_at).toLocaleDateString('pt-BR')}
+                                            </td>
+                                            <td className="px-5 py-4 text-right">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleDelete(doc.id)}
+                                                    className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                )}
+                )
+                }
             </div>
         </div>
     );

@@ -470,28 +470,28 @@ const Canais = () => {
                     <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden border border-purple-100 flex flex-col max-h-[95vh] sm:max-h-[90vh]">
                         {/* Header */}
                         <div className="p-4 sm:p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
-                                    <Bot className="w-6 h-6" />
+                            <div className="flex items-center gap-2 sm:gap-3">
+                                <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg sm:rounded-xl backdrop-blur-md">
+                                    <Bot className="w-5 h-5 sm:w-6 sm:h-6" />
                                 </div>
-                                <div>
-                                    <h3 className="text-xl font-bold">Configurar Agente IA</h3>
-                                    <p className="text-purple-100 text-xs mt-0.5">{editingAIInstance.name}</p>
+                                <div className="min-w-0">
+                                    <h3 className="text-lg sm:text-xl font-bold truncate">Configurar Agente IA</h3>
+                                    <p className="text-purple-100 text-[10px] sm:text-xs mt-0.5 truncate">{editingAIInstance.name}</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowPromptModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                                <XCircle className="w-6 h-6" />
+                            <button onClick={() => setShowPromptModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors shrink-0">
+                                <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />
                             </button>
                         </div>
 
                         <Tabs value={activeAITab} onValueChange={setActiveAITab} className="flex-1 flex flex-col overflow-hidden">
-                            <div className="px-6 pt-4 bg-gray-50/50 border-b border-gray-100">
+                            <div className="px-4 sm:px-6 pt-4 bg-gray-50/50 border-b border-gray-100">
                                 <TabsList className="grid w-full grid-cols-2 bg-gray-100/50 p-1 rounded-xl">
-                                    <TabsTrigger value="behavior" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all">
+                                    <TabsTrigger value="behavior" className="rounded-lg font-bold text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all py-2">
                                         🤖 Comportamento
                                     </TabsTrigger>
-                                    <TabsTrigger value="knowledge" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all">
-                                        📚 Conhecimento (RAG)
+                                    <TabsTrigger value="knowledge" className="rounded-lg font-bold text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:text-purple-600 data-[state=active]:shadow-sm transition-all py-2">
+                                        📚 Conhecimento
                                     </TabsTrigger>
                                 </TabsList>
                             </div>
@@ -571,20 +571,20 @@ const Canais = () => {
 
                         {/* Footer - Only show buttons if behavior tab is active */}
                         {activeAITab === "behavior" && (
-                            <div className="p-6 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-3">
+                            <div className="p-4 sm:p-6 bg-gray-50/80 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-end gap-3">
                                 <Button
                                     variant="ghost"
                                     onClick={() => setShowPromptModal(false)}
-                                    className="rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors"
+                                    className="w-full sm:w-auto rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition-colors h-11 sm:h-12"
                                 >
                                     Cancelar
                                 </Button>
                                 <Button
                                     onClick={updateAIConfig}
                                     disabled={savingAI}
-                                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold h-12 px-8 rounded-xl shadow-xl shadow-purple-200 min-w-[140px]"
+                                    className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold h-11 sm:h-12 px-8 rounded-xl shadow-xl shadow-purple-200 min-w-[140px]"
                                 >
-                                    {savingAI ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar Configurações"}
+                                    {savingAI ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar Agente"}
                                 </Button>
                             </div>
                         )}
