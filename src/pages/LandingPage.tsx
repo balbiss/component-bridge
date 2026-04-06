@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Pricing } from '@/components/ui/pricing';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Code, Palette, Zap, Users, Star, Shield, Menu, X } from 'lucide-react';
 import { PremiumTestimonials } from '@/components/ui/premium-testimonials';
@@ -121,7 +120,6 @@ const LandingPage: React.FC = () => {
             {/* Desktop links */}
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-sm text-white/70 hover:text-white transition-colors">Recursos</a>
-              <a href="#pricing" className="text-sm text-white/70 hover:text-white transition-colors">Planos</a>
               <a href="#stats" className="text-sm text-white/70 hover:text-white transition-colors">Números</a>
               <a href="#cta" className="text-sm text-white/70 hover:text-white transition-colors">Contato</a>
             </div>
@@ -154,7 +152,6 @@ const LandingPage: React.FC = () => {
           {mobileMenuOpen && (
             <div className="md:hidden mt-4 rounded-2xl border border-white/10 bg-purple-950/90 backdrop-blur-lg p-6 space-y-4">
               <a href="#features" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-white/70 hover:text-white py-2">Recursos</a>
-              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-white/70 hover:text-white py-2">Planos</a>
               <a href="#stats" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-white/70 hover:text-white py-2">Números</a>
               <a href="#cta" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-white/70 hover:text-white py-2">Contato</a>
               <div className="flex flex-col gap-2 pt-3 border-t border-white/10">
@@ -275,45 +272,6 @@ const LandingPage: React.FC = () => {
             </div>
           </div>
         </section>
-
-        {/* ── PRICING ── */}
-        <div id="pricing">
-          <Pricing plans={[
-            {
-              name: "INICIANTE",
-              price: "49",
-              yearlyPrice: "39",
-              period: "por mês",
-              features: ["Até 10 projetos", "Análises básicas", "Suporte em 48 horas", "Acesso limitado à API", "Suporte da comunidade"],
-              description: "Perfeito para projetos individuais",
-              buttonText: "Começar grátis",
-              href: "/cadastro",
-              isPopular: false,
-            },
-            {
-              name: "PROFISSIONAL",
-              price: "99",
-              yearlyPrice: "79",
-              period: "por mês",
-              features: ["Projetos ilimitados", "Análises avançadas", "Suporte em 24 horas", "Acesso total à API", "Suporte prioritário", "Colaboração em equipe", "Integrações personalizadas"],
-              description: "Ideal para equipes em crescimento",
-              buttonText: "Escolher plano",
-              href: "/cadastro",
-              isPopular: true,
-            },
-            {
-              name: "EMPRESARIAL",
-              price: "299",
-              yearlyPrice: "239",
-              period: "por mês",
-              features: ["Tudo do Profissional", "Soluções personalizadas", "Gerente de conta dedicado", "Suporte em 1 hora", "Autenticação SSO", "Segurança avançada", "Contratos personalizados", "Acordo de SLA"],
-              description: "Para grandes organizações",
-              buttonText: "Falar com vendas",
-              href: "/cadastro",
-              isPopular: false,
-            },
-          ]} />
-        </div>
 
         {/* ── STATS ── */}
         <section id="stats" className="px-4 sm:px-8 lg:px-16 py-16 sm:py-24">
