@@ -206,11 +206,8 @@ const Dashboard = () => {
             <h1 className="text-gray-900 font-semibold text-lg hidden sm:block">Dashboard</h1>
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-500">
-            <span className="text-xs text-gray-400">Seu plano</span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
-              Pro
-            </span>
             <span className="hidden sm:inline">
+
               {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/^./, (c) => c.toUpperCase()).replace(/de (\w)/, (m, c) => 'de ' + c.toUpperCase())}
               {' · '}
             </span>

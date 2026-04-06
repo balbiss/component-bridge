@@ -33,7 +33,7 @@ const Atendimentos = () => {
 
     const messages = [
         { id: 1, text: 'Olá! Como posso te ajudar?', sender: 'me', time: '10:25' },
-        { id: 2, text: 'Gostaria de saber mais sobre os planos de automação.', sender: 'them', time: '10:30' },
+        { id: 2, text: 'Como posso realizar disparos em massa?', sender: 'them', time: '10:30' },
     ];
 
     return (

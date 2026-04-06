@@ -52,7 +52,6 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                                 <div className="flex items-center gap-3 pl-2 border-l border-gray-100">
                                     <div className="text-right hidden sm:block">
                                         <p className="text-sm font-semibold text-gray-900 leading-none mb-1">{user?.email?.split('@')[0] || 'Usuário'}</p>
-                                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-100 text-[10px] h-4 uppercase font-bold px-1.5">Plano Pro</Badge>
                                     </div>
                                     <Avatar className="w-9 h-9 border-2 border-white shadow-sm ring-1 ring-gray-100">
                                         <AvatarFallback className="bg-purple-600/10 text-purple-700 text-xs font-bold uppercase">
